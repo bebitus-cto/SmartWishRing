@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.manridy.sdkdemo_mrd2019">
+
+    <application
+        android:name=".MyApplication"
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme">
+        <activity android:name=".activity.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name=".activity.ScanActivity"
+            android:label="搜索并连接设备设备"
+            android:screenOrientation="portrait" />
+
+        <service
+            android:name="com.realsil.sdk.dfu.DfuService"
+            android:enabled="true"
+            android:exported="true" />
+
+        <!--曼瑞德-->
+<!--        <meta-data-->
+<!--            android:name="com.manridy.sdk_mrd2019.key"-->
+<!--            android:value="8A87D841704A9A07EBF213D9C657E3A4" />-->
+        <!--曼瑞德-->
+    </application>
+
+    <!--使用蓝牙-->
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <!--蓝牙管理-->
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <uses-permission android:name="android.bluetooth.device.action.FOUND" />
+    <!--获取粗略位置-->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!--获取精确位置-->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+
+    <uses-feature
+        android:glEsVersion="0x00020000"
+        android:required="true" />
+    <uses-feature
+        android:name="android.hardware.bluetooth_le"
+        android:required="true" />
+</manifest>

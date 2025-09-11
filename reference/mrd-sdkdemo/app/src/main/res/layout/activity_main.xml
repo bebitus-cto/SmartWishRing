@@ -1,0 +1,956 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    tools:ignore="HardcodedText">
+
+    <LinearLayout
+        android:id="@+id/lin_device"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/adapter_item_bg"
+        android:orientation="vertical"
+        android:padding="10dp">
+
+        <TextView
+            android:id="@+id/tv_device_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="未绑定设备"
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/tv_device_state"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textSize="16sp" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1px"
+        android:background="@color/colorPrimary" />
+
+    <LinearLayout
+        android:id="@+id/lin_scan"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/adapter_item_bg"
+        android:orientation="vertical"
+        android:padding="10dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="搜索设备"
+            android:textSize="16sp" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1px"
+        android:background="@color/colorPrimary" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <Button
+                android:id="@+id/bt_clean_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_margin="5dp"
+                android:background="@drawable/bt_bg"
+                android:onClick="onClick"
+                android:text="清空"
+                android:textColor="#fff" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rv_body"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+
+            <ScrollView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/text"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:padding="3dp"
+                        android:text="暂无数据" />
+
+                </LinearLayout>
+            </ScrollView>
+        </LinearLayout>
+
+        <View
+            android:layout_width="1px"
+            android:layout_height="match_parent"
+            android:background="@color/colorPrimary" />
+
+        <ScrollView
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <Button
+                    android:id="@+id/bt_firmware"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="固件版本号"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_battery"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="当前电量"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_restore"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="恢复出厂设置"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_get_screen_info"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="获取设备屏幕信息"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_brightness"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="亮度调节"
+                    android:textColor="#fff" />
+
+
+                <Button
+                    android:id="@+id/bt_set_time"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="设置手环时间"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_set_clock"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="设置手环闹钟"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_get_clock"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="获取手环闹钟"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_get_Step"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="获取计步数据"
+                    android:textColor="#fff" />
+
+
+                <Button
+                    android:id="@+id/bt_get_history"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="获取历史数据(星迈)"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_install_dial_starmax_one"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="安装表盘(星迈)"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_refresh_ui"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="差分更新UI"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_inquiry_dial_index"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="查询表盘序号"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_ota_rtk"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="OTA(瑞昱)"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_ota_nordic"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="OTA(nordic)"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_ota_syd"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="OTA(SYD)"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_get_StepHistoryNum"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="获取计步历史条数"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_get_step_history_time"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="获取计步历史数据(按日)"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_get_StepHistoryData"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="获取计步历史数据"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_set_userinfo"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="推送用户信息"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_load_userinfo"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="获取用户信息"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_set_SportTarget"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="设置运动目标"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_load_sport_target"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="获取运动目标"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_set_EcgHrTest"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="心电测试测试"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_set_HrTest"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="心率测试"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_set_hrv_test"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="压力测试"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_get_HrData_0"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="获取最近一次心率数据"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_get_HrData_1"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="获取历史心率数据"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_get_HrData_2"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="获取历史心率个数数据"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_get_EcgHrData_0"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="获取最近一次ECG心率数据"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_get_EcgHrData_1"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="获取历史ECG心率数据"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_get_EcgHrData_2"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="获取历史ECG心率个数数据"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_get_bp"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="获取最近一次血压数据"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_get_bo"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="获取最近一次血氧数据"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_get_hrv"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="获取最近一次压力"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_get_Sleep_0"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="获取今日睡眠"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_get_Sleep_1"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="获取历史睡眠数据"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_get_Sleep_2"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="获取历史睡眠个数数据"
+                    android:textColor="#fff" />
+
+
+                <Button
+                    android:id="@+id/bt_app_push"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="消息推送"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_findDevice"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="查找手环"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_Wrist"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="翻腕亮屏设置"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_load_wrist"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="获取翻腕亮屏信息"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_Sedentary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="久坐提醒/免打扰"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_load_sedentary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="获取久坐提醒/免打扰信息"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_get_drink_info"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="喝水提醒信息获取"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_set_drink_info"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="喝水提醒设置"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_setUnit"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="单位制选择"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_load_unit"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="获取单位制"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_setHourSelect"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="24小时或12小时切换"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_load_hour_unit"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="获取时间单位制"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_setCamera"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="拍照"
+                    android:textColor="#fff" />
+
+
+                <Button
+                    android:id="@+id/bt_setTimingHrTest"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="定时心率测量"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_setLightTime"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="亮屏时间设置"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_setWeather"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="设置天气"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_setDoNotDisturbCmd"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="全局免打扰提醒设置"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_getDoNotDisturbCmd"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="查询全局免打扰时间"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_setHeartBloodAlert"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="心率血压报警设置"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_setlanguage"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="设置语言"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_getStepSectionHistroy"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="获取分段计步历史"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_getStepSectionNum"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="获取分段计步长度"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_get_sport"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="获取运动数据"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_get_SportHistoryNum"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="获取运动历史条数"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_get_SportHistoryData"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="获取运动历史数据"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_setLostDeviceAlert"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="防丢提醒设置"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_query_lost_alert"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="防丢提醒查询"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_getTemp"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="体温数据测试"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_set_due_day"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="设定预产期时间"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_set_menstruation_day"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="设定行经期与月经期天数"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_get_female_info"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="获取经期信息"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_advertisement_modification"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="Advertisement Modification"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_advertisement_acquisition"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="Advertisement Acquisition"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_algorithm_parameters_modification"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="Algorithm Parameters Modification"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_get_algorithm_parameters_modification"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="get Algorithm Parameters Modification"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_algorithm_parameters_modification2"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="Algorithm Parameters Modification2"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_get_algorithm_parameters_modification2"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="get Algorithm Parameters Modification2"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_algorithm_parameters_modification3"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="Algorithm Parameters Modification3"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_get_algorithm_parameters_modification3"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="get Algorithm Parameters Modification3"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_algorithm_parameters_acquisition"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="Algorithm Parameters Acquisition"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_setTimingTempTest"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="定时温度测量"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/bt_getTimingTempTest"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="获取定时温度测量"
+                    android:textColor="#fff" />
+
+
+                <Button
+                    android:id="@+id/broadcastVitalSignsData"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="VitalsOverride广播生命体征数据"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/broadcastAlgorithmDebugData"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="VitalsOverride广播算法调试数据"
+                    android:textColor="#fff" />
+
+                <Button
+                    android:id="@+id/getVitalsOverrideParams"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="5dp"
+                    android:background="@drawable/bt_bg"
+                    android:onClick="onClick"
+                    android:text="获取VitalsOverride"
+                    android:textColor="#fff" />
+            </LinearLayout>
+        </ScrollView>
+    </LinearLayout>
+
+</LinearLayout>
