@@ -164,6 +164,13 @@ data class HomeViewState(
         get() = deviceBatteryLevel?.let { "${it}%" } ?: "--"
     
     /**
+     * Should show battery level
+     * Only show when device is connected and battery level is available
+     */
+    val shouldShowBatteryLevel: Boolean
+        get() = isBleConnected && deviceBatteryLevel != null
+    
+    /**
      * Get battery level icon
      */
     val batteryLevelIcon: String

@@ -1,11 +1,9 @@
-package com.wishring.app.presentation.detail
+package com.wishring.app.presentation.wishdetail
 
 import com.wishring.app.domain.model.DailyRecord
 
-import com.wishring.app.domain.model.WishCount
 import com.wishring.app.domain.repository.WishCountStatistics
 import java.time.LocalDate
-import com.wishring.app.presentation.detail.ResetLog
 
 /**
  * ViewState for Detail screen

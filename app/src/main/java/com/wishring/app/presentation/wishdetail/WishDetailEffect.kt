@@ -1,4 +1,4 @@
-package com.wishring.app.presentation.detail
+package com.wishring.app.presentation.wishdetail
 
 import java.time.LocalDate
 

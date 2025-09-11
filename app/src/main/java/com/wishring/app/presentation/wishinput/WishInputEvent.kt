@@ -1,22 +1,38 @@
 package com.wishring.app.presentation.wishinput
 
+import java.util.UUID
+
 /**
  * User events for WishInput screen
- * Represents user interactions and actions
+ * Represents user interactions and actions (supports multiple wishes)
  */
 sealed class WishInputEvent {
     
     /**
-     * Update wish text
-     * @param text New wish text
+     * Add new wish to the list
+     * @param position Optional position to insert at
      */
-    data class UpdateWishText(val text: String) : WishInputEvent()
+    data class AddWish(val position: Int? = null) : WishInputEvent()
     
     /**
-     * Update target count
+     * Remove wish from the list
+     * @param wishId ID of the wish to remove
+     */
+    data class RemoveWish(val wishId: UUID) : WishInputEvent()
+    
+    /**
+     * Update specific wish text
+     * @param wishId ID of the wish to update
+     * @param text New wish text
+     */
+    data class UpdateWishText(val wishId: UUID, val text: String) : WishInputEvent()
+    
+    /**
+     * Update specific wish target count
+     * @param wishId ID of the wish to update  
      * @param count New target count
      */
-    data class UpdateTargetCount(val count: Int) : WishInputEvent()
+    data class UpdateWishCount(val wishId: UUID, val count: Int) : WishInputEvent()
     
     /**
      * Select suggested wish

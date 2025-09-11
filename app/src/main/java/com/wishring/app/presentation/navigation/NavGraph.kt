@@ -8,7 +8,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.wishring.app.presentation.detail.DetailScreen
+import com.wishring.app.presentation.wishdetail.WishDetailScreen
 import com.wishring.app.presentation.home.HomeScreen
 import com.wishring.app.presentation.splash.SplashScreen
 import com.wishring.app.presentation.settings.SettingsScreen
@@ -66,7 +66,7 @@ fun WishRingNavGraph(
             )
         ) { backStackEntry ->
             val date = backStackEntry.arguments?.getString(Screen.Detail.ARG_DATE)
-            DetailScreen(
+            WishDetailScreen(
                 initialDate = date,
                 onNavigateBack = {
                     navController.popBackStack()

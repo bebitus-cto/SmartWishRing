@@ -1,4 +1,4 @@
-package com.wishring.app.presentation.detail
+package com.wishring.app.presentation.wishdetail
 
 import kotlinx.coroutines.flow.MutableStateFlow
 import androidx.lifecycle.viewModelScope
@@ -13,28 +13,18 @@ import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
 // Import types from DetailEvent
-import com.wishring.app.presentation.detail.ResetLog as PresentationResetLog
-import com.wishring.app.presentation.detail.ExportFormat
+import com.wishring.app.presentation.wishdetail.ResetLog as PresentationResetLog
 
-// Import types from DetailEffect  
-import com.wishring.app.presentation.detail.ResetDetailsInfo
-import com.wishring.app.presentation.detail.ShareContent
-import com.wishring.app.presentation.detail.StatisticsDetails
-import com.wishring.app.presentation.detail.TransitionDirection
-import com.wishring.app.presentation.detail.SoundType
+// Import types from DetailEffect
 
 // Import types from DetailViewState
-import com.wishring.app.presentation.detail.ViewMode
-import com.wishring.app.presentation.detail.ChartData
-import com.wishring.app.presentation.detail.ChartDataPoint
-import com.wishring.app.presentation.detail.ChartType
 
 /**
  * ViewModel for Detail screen
  * Manages daily records, statistics, and calendar view
  */
 @HiltViewModel
-class DetailViewModel @Inject constructor(
+class WishDetailViewModel @Inject constructor(
     private val wishCountRepository: WishCountRepository,
     private val resetLogRepository: ResetLogRepository
 ) :

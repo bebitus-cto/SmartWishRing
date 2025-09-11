@@ -1,4 +1,4 @@
-package com.wishring.app.presentation.detail.component
+package com.wishring.app.presentation.wishdetail.component
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme

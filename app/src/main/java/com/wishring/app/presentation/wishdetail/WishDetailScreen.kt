@@ -1,4 +1,4 @@
-package com.wishring.app.presentation.detail
+package com.wishring.app.presentation.wishdetail
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -29,7 +29,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.wishring.app.R
 import com.wishring.app.domain.model.DailyRecord
-import com.wishring.app.presentation.detail.component.*
 import com.wishring.app.ui.theme.*
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -40,10 +39,10 @@ import java.time.format.DateTimeFormatter
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DetailScreen(
+fun WishDetailScreen(
     initialDate: String? = null,
     onNavigateBack: () -> Unit = {},
-    viewModel: DetailViewModel = hiltViewModel()
+    viewModel: WishDetailViewModel = hiltViewModel()
 ) {
     val viewState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -79,13 +78,13 @@ fun DetailScreen(
     Scaffold(
         containerColor = Background_Secondary,
         topBar = {
-            DetailTopBar(
+            WishDetailTopBar(
                 onBackClick = { viewModel.onEvent(DetailEvent.NavigateBack) },
                 onShareClick = { viewModel.onEvent(DetailEvent.ShareRecord()) }
             )
         }
     ) { paddingValues ->
-        DetailContent(
+        WishDetailContent(
             viewState = viewState,
             onEvent = viewModel::onEvent,
             modifier = Modifier.padding(paddingValues)
@@ -94,7 +93,7 @@ fun DetailScreen(
 }
 
 @Composable
-private fun DetailContent(
+private fun WishDetailContent(
     viewState: DetailViewState,
     onEvent: (DetailEvent) -> Unit,
     modifier: Modifier = Modifier
@@ -332,7 +331,7 @@ private fun DetailContent(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DetailTopBar(
+private fun WishDetailTopBar(
     onBackClick: () -> Unit,
     onShareClick: () -> Unit
 ) {
@@ -481,7 +480,7 @@ private fun calculateStreak(records: List<DailyRecord>): Int {
 
 @Preview(showBackground = true, device = "id:pixel_5")
 @Composable
-fun DetailScreenPreview() {
+fun WishDetailScreenPreview() {
     WishRingTheme {
         val previewState = DetailViewState(
             selectedDate = LocalDate.of(2025, 8, 21),
@@ -500,7 +499,7 @@ fun DetailScreenPreview() {
             isLoading = false
         )
         
-        DetailContent(
+        WishDetailContent(
             viewState = previewState,
             onEvent = {}
         )

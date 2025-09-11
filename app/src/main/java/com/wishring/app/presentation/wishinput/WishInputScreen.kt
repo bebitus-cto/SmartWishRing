@@ -5,13 +5,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-
 import androidx.compose.foundation.shape.RoundedCornerShape
-
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -31,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.wishring.app.R
+import com.wishring.app.presentation.component.WishCard
 import com.wishring.app.presentation.wishinput.component.*
 import com.wishring.app.ui.theme.*
 
@@ -110,191 +108,121 @@ private fun WishInputContent(
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 17.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Section 1: Wish text input
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(170.dp),
-                shape = RoundedCornerShape(5.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color.White
+            // Section title
+            Text(
+                text = "오늘의 소원을 등록하세요 (최대 3개)",
+                style = MaterialTheme.typography.headlineSmall.copy(
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold
                 ),
-                elevation = CardDefaults.cardElevation(
-                    defaultElevation = 3.dp
+                color = Text_Primary,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            
+            // Multiple wish cards
+            viewState.wishes.forEachIndexed { index, wish ->
+                WishCard(
+                    wishText = wish.text,
+                    isInputMode = true,
+                    targetCount = wish.targetCount,
+                    onTextChange = { text ->
+                        onEvent(WishInputEvent.UpdateWishText(wish.id, text))
+                    },
+                    onTargetCountChange = { count ->
+                        onEvent(WishInputEvent.UpdateWishCount(wish.id, count))
+                    },
+                    onDelete = if (viewState.canRemoveWishes) {
+                        { onEvent(WishInputEvent.RemoveWish(wish.id)) }
+                    } else null,
+                    showDeleteButton = viewState.canRemoveWishes,
+                    placeholder = "소원 ${index + 1}을 입력하세요...",
+                    modifier = Modifier.fillMaxWidth()
                 )
-            ) {
-                Column(
-                    modifier = Modifier.padding(14.dp)
-                ) {
-                    Text(
-                        text = "1. 원하는 것을 적어보세요",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold
-                        ),
-                        color = Text_Primary
-                    )
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                            .background(
-                                color = Color(0xFFF9FBFF),
-                                shape = RoundedCornerShape(5.dp)
-                            )
-                            .border(
-                                width = 1.dp,
-                                color = Color(0xFFF0F0F0),
-                                shape = RoundedCornerShape(5.dp)
-                            )
-                            .padding(8.dp)
-                    ) {
-                        if (viewState.wishText.isEmpty()) {
-                            Text(
-                                text = "(예: 확언문장, 기도문, 이루고 싶은 목표 / 최대 10개)",
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Normal
-                                ),
-                                color = Text_Primary.copy(alpha = 0.5f)
-                            )
-                        }
-                        
-                        BasicTextField(
-                            value = viewState.wishText,
-                            onValueChange = { text ->
-                                onEvent(WishInputEvent.UpdateWishText(text))
-                            },
-                            modifier = Modifier.fillMaxSize(),
-                            textStyle = MaterialTheme.typography.bodySmall.copy(
-                                fontSize = 12.sp,
-                                color = Text_Primary
-                            ),
-                            maxLines = 5
-                        )
-                    }
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    Text(
-                        text = "(예: 확언문장, 기도문, 이루고 싶은 목표 /  최대 10개)",
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.SemiBold
-                        ),
-                        color = Text_Primary.copy(alpha = 0.5f)
-                    )
-                }
             }
             
-            // Section 2: Target count input
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(170.dp),
-                shape = RoundedCornerShape(5.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color.White
-                ),
-                elevation = CardDefaults.cardElevation(
-                    defaultElevation = 3.dp
-                )
-            ) {
-                Column(
-                    modifier = Modifier.padding(14.dp)
+            // Add wish button or max message
+            if (viewState.canAddMoreWishes) {
+                OutlinedButton(
+                    onClick = { onEvent(WishInputEvent.AddWish()) },
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .padding(vertical = 8.dp),
+                    shape = RoundedCornerShape(25.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Purple_Medium
+                    ),
+                    border = ButtonDefaults.outlinedButtonBorder.copy(
+                        brush = androidx.compose.ui.graphics.SolidColor(Purple_Medium)
+                    )
                 ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Add wish",
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "2. 목표 횟수를 입력하세요.",
+                        text = "소원 추가",
                         style = MaterialTheme.typography.bodyMedium.copy(
                             fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold
-                        ),
-                        color = Text_Primary
-                    )
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                            .background(
-                                color = Color(0xFFF9FBFF),
-                                shape = RoundedCornerShape(5.dp)
-                            )
-                            .border(
-                                width = 1.dp,
-                                color = Color(0xFFF0F0F0),
-                                shape = RoundedCornerShape(5.dp)
-                            )
-                            .padding(8.dp)
-                    ) {
-                        if (viewState.targetCount == 0) {
-                            Text(
-                                text = "(작은 반복이 큰 변화를 만듭니다. / 예: 100회, 1,000회, 10,000회)",
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Normal
-                                ),
-                                color = Text_Primary.copy(alpha = 0.5f)
-                            )
-                        }
-                        
-                        BasicTextField(
-                            value = if (viewState.targetCount > 0) viewState.targetCount.toString() else "",
-                            onValueChange = { text ->
-                                text.toIntOrNull()?.let { count ->
-                                    onEvent(WishInputEvent.UpdateTargetCount(count))
-                                }
-                            },
-                            modifier = Modifier.fillMaxSize(),
-                            textStyle = MaterialTheme.typography.bodySmall.copy(
-                                fontSize = 12.sp,
-                                color = Text_Primary
-                            ),
-                            keyboardOptions = KeyboardOptions(
-                                keyboardType = KeyboardType.Number
-                            ),
-                            singleLine = true
+                            fontWeight = FontWeight.Medium
                         )
-                    }
+                    )
+                }
+            } else {
+                Card(
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .padding(vertical = 8.dp),
+                    shape = RoundedCornerShape(15.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color(0xFFF5F5F5)
+                    )
+                ) {
+                    Text(
+                        text = "✨ 최대 3개의 소원까지 등록할 수 있어요",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        ),
+                        color = Color(0xFF666666),
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
                 }
             }
             
             Spacer(modifier = Modifier.weight(1f))
             
-            // Close button
+            // Save button
             Button(
                 onClick = { onEvent(WishInputEvent.SaveWish) },
+                enabled = viewState.isSaveEnabled,
                 modifier = Modifier
                     .align(Alignment.CenterHorizontally)
-                    .width(150.dp)
-                    .height(28.dp),
-                shape = RoundedCornerShape(50.dp),
+                    .width(160.dp)
+                    .height(40.dp),
+                shape = RoundedCornerShape(25.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Purple_Medium
+                    containerColor = Purple_Medium,
+                    disabledContainerColor = Color(0xFFCCCCCC)
                 ),
                 elevation = ButtonDefaults.buttonElevation(
                     defaultElevation = 3.dp
-                ),
-                contentPadding = PaddingValues(vertical = 6.dp)
+                )
             ) {
-                if (viewState.isLoading) {
+                if (viewState.isSaving) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
+                        modifier = Modifier.size(20.dp),
                         color = Color.White,
                         strokeWidth = 2.dp
                     )
                 } else {
                     Text(
-                        text = "닫기",
+                        text = "소원 등록하기",
                         style = MaterialTheme.typography.labelLarge.copy(
-                            fontSize = 12.sp,
+                            fontSize = 14.sp,
                             fontWeight = FontWeight.Bold
                         ),
                         color = Color.White
@@ -349,15 +277,251 @@ private fun WishInputTopBar(
     }
 }
 
-@Preview(showBackground = true, device = "id:pixel_5")
+@Preview(showBackground = true, device = "id:pixel_5", name = "Single Wish")
 @Composable
-fun WishInputScreenPreview() {
+fun WishInputScreenSinglePreview() {
     WishRingTheme {
         val previewState = WishInputViewState(
-            wishText = "나는 매일 성장하고 있다",
-            targetCount = 1000,
-            isLoading = false,
-            showSuggestions = false
+            wishes = listOf(
+                com.wishring.app.presentation.wishinput.model.WishItem.create(
+                    text = "나는 매일 성장하고 있다",
+                    targetCount = 1000
+                )
+            ),
+            isLoading = false
+        )
+        
+        WishInputContent(
+            viewState = previewState,
+            onEvent = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, device = "id:pixel_5", name = "Multiple Wishes")
+@Composable
+fun WishInputScreenMultiplePreview() {
+    WishRingTheme {
+        val previewState = WishInputViewState(
+            wishes = listOf(
+                com.wishring.app.presentation.wishinput.model.WishItem.create(
+                    text = "나는 매일 성장하고 있다",
+                    targetCount = 1000
+                ),
+                com.wishring.app.presentation.wishinput.model.WishItem.create(
+                    text = "건강한 습관을 만들어간다",
+                    targetCount = 2000
+                ),
+                com.wishring.app.presentation.wishinput.model.WishItem.createEmpty()
+            ),
+            isLoading = false
+        )
+        
+        WishInputContent(
+            viewState = previewState,
+            onEvent = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, device = "id:pixel_5", name = "Max Wishes Reached")
+@Composable
+fun WishInputScreenMaxPreview() {
+    WishRingTheme {
+        val previewState = WishInputViewState(
+            wishes = listOf(
+                com.wishring.app.presentation.wishinput.model.WishItem.create(
+                    text = "나는 매일 성장하고 있다",
+                    targetCount = 1000
+                ),
+                com.wishring.app.presentation.wishinput.model.WishItem.create(
+                    text = "건강한 습관을 만들어간다",
+                    targetCount = 2000
+                ),
+                com.wishring.app.presentation.wishinput.model.WishItem.create(
+                    text = "감사하는 마음을 가진다",
+                    targetCount = 1500
+                )
+            ),
+            isLoading = false
+        )
+        
+        WishInputContent(
+            viewState = previewState,
+            onEvent = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, device = "id:pixel_5", name = "Empty Initial")
+@Composable
+fun WishInputScreenEmptyPreview() {
+    WishRingTheme {
+        val previewState = WishInputViewState(
+            wishes = listOf(
+                com.wishring.app.presentation.wishinput.model.WishItem.createEmpty()
+            ),
+            isLoading = false
+        )
+        
+        WishInputContent(
+            viewState = previewState,
+            onEvent = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, device = "id:pixel_5", name = "Saving State")
+@Composable
+fun WishInputScreenSavingPreview() {
+    WishRingTheme {
+        val previewState = WishInputViewState(
+            wishes = listOf(
+                com.wishring.app.presentation.wishinput.model.WishItem.create(
+                    text = "저장 중인 소원",
+                    targetCount = 1000
+                )
+            ),
+            isSaving = true,
+            isLoading = false
+        )
+        
+        WishInputContent(
+            viewState = previewState,
+            onEvent = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, device = "id:pixel_5", name = "Error State")
+@Composable
+fun WishInputScreenErrorPreview() {
+    WishRingTheme {
+        val previewState = WishInputViewState(
+            wishes = listOf(
+                com.wishring.app.presentation.wishinput.model.WishItem.create(
+                    text = "문제가 있는 소원",
+                    targetCount = 1000
+                )
+            ),
+            error = "위시 저장에 실패했습니다",
+            isSaving = false
+        )
+        
+        WishInputContent(
+            viewState = previewState,
+            onEvent = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, device = "id:pixel_5", name = "Edit Mode")
+@Composable
+fun WishInputScreenEditModePreview() {
+    WishRingTheme {
+        val previewState = WishInputViewState(
+            wishes = listOf(
+                com.wishring.app.presentation.wishinput.model.WishItem.create(
+                    text = "수정 중인 기존 소원",
+                    targetCount = 2000
+                )
+            ),
+            isEditMode = true,
+            existingRecord = true
+        )
+        
+        WishInputContent(
+            viewState = previewState,
+            onEvent = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, device = "id:pixel_5", name = "Delete Confirmation")
+@Composable
+fun WishInputScreenDeleteConfirmationPreview() {
+    WishRingTheme {
+        val previewState = WishInputViewState(
+            wishes = listOf(
+                com.wishring.app.presentation.wishinput.model.WishItem.create(
+                    text = "삭제할 소원",
+                    targetCount = 1500
+                )
+            ),
+            isEditMode = true,
+            existingRecord = true,
+            showDeleteConfirmation = true
+        )
+        
+        WishInputContent(
+            viewState = previewState,
+            onEvent = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, device = "id:pixel_5", name = "Two Wishes Partial")
+@Composable
+fun WishInputScreenTwoWishesPartialPreview() {
+    WishRingTheme {
+        val previewState = WishInputViewState(
+            wishes = listOf(
+                com.wishring.app.presentation.wishinput.model.WishItem.create(
+                    text = "첫 번째 소원",
+                    targetCount = 1000
+                ),
+                com.wishring.app.presentation.wishinput.model.WishItem.createEmpty()
+            ),
+            isLoading = false
+        )
+        
+        WishInputContent(
+            viewState = previewState,
+            onEvent = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, device = "id:pixel_5", name = "Long Text")
+@Composable
+fun WishInputScreenLongTextPreview() {
+    WishRingTheme {
+        val previewState = WishInputViewState(
+            wishes = listOf(
+                com.wishring.app.presentation.wishinput.model.WishItem.create(
+                    text = "매우 긴 소원 텍스트입니다. 이것은 한 줄에 다 들어가지 않을 정도로 길고 복잡한 내용을 담고 있어서 텍스트 오버플로우나 줄바꿈 처리를 테스트하기 위한 예시입니다",
+                    targetCount = 1000
+                )
+            )
+        )
+        
+        WishInputContent(
+            viewState = previewState,
+            onEvent = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, device = "id:pixel_5", name = "High Target Values")
+@Composable
+fun WishInputScreenHighTargetPreview() {
+    WishRingTheme {
+        val previewState = WishInputViewState(
+            wishes = listOf(
+                com.wishring.app.presentation.wishinput.model.WishItem.create(
+                    text = "높은 목표의 첫 번째 위시",
+                    targetCount = 5000
+                ),
+                com.wishring.app.presentation.wishinput.model.WishItem.create(
+                    text = "높은 목표의 두 번째 위시",
+                    targetCount = 8000
+                ),
+                com.wishring.app.presentation.wishinput.model.WishItem.create(
+                    text = "최고 목표의 세 번째 위시",
+                    targetCount = 10000
+                )
+            ),
+            isLoading = false
         )
         
         WishInputContent(

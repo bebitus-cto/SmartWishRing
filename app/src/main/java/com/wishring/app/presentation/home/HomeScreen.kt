@@ -55,6 +55,7 @@ import com.wishring.app.domain.model.DailyRecord
 import com.wishring.app.domain.model.WishCount
 import com.wishring.app.domain.repository.BleConnectionState
 import com.wishring.app.presentation.component.CircularProgress
+import com.wishring.app.presentation.component.WishCard
 import com.wishring.app.presentation.home.component.WishReportItem
 import com.wishring.app.ui.theme.Purple_Medium
 import com.wishring.app.ui.theme.Purple_Primary
@@ -128,32 +129,42 @@ private fun HomeScreenContent(
         ) {
             Spacer(modifier = Modifier.height(60.dp))
             
-            // Header text
-            Text(
-                text = "나는 매일 성장하고 있다.",
-                style = MaterialTheme.typography.headlineSmall.copy(
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                ),
-                color = Color(0xFF333333),
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
+            // 위시 리스트 섹션 (과거 기록이 있으면 표시)
+            if (uiState.recentRecords.isNotEmpty()) {
+                WishListSection(
+                    recentRecords = uiState.recentRecords,
+                    onWishClick = { date ->
+                        onEvent(HomeEvent.NavigateToDetail(date))
+                    }
+                )
+                Spacer(modifier = Modifier.height(30.dp))
+            }
             
-            Spacer(modifier = Modifier.height(30.dp))
-            
-            // Conditional UI based on today's wish registration
+            // 오늘의 카운트 카드 (진행중인 위시가 있으면 표시)
             if (uiState.todayWishCount != null) {
-                // Show TopContentCard if today's wish exists
-                TopContentCard(
-                    currentCount = uiState.currentCount,
-                    targetCount = uiState.targetCount
+                TodayCountCard(
+                    currentCount = uiState.todayWishCount.totalCount,
+                    targetCount = uiState.todayWishCount.targetCount
                 )
-            } else {
-                // Show wish registration prompt if no today's wish
-                WishRegistrationPrompt(
-                    onClick = { onEvent(HomeEvent.NavigateToWishInput) }
-                )
+                Spacer(modifier = Modifier.height(20.dp))
+            }
+            
+            // 버튼 표시 로직
+            when {
+                uiState.todayWishCount == null && uiState.recentRecords.isEmpty() -> {
+                    // 완전히 비어있는 상태 (0개)
+                    WishRegistrationPrompt(
+                        onClick = { onEvent(HomeEvent.NavigateToWishInput) },
+                        remainingCount = 3
+                    )
+                }
+                uiState.todayWishCount == null && uiState.recentRecords.size < 3 -> {
+                    // 과거 기록은 있지만 3개 미만이고 오늘 위시 없음 (1-2개)
+                    WishButton(
+                        onClick = { onEvent(HomeEvent.NavigateToWishInput) }
+                    )
+                }
+                // 그 외 경우: 3개 이상이거나 오늘 위시 진행중이면 버튼 없음
             }
             
             Spacer(modifier = Modifier.height(50.dp))
@@ -170,8 +181,7 @@ private fun HomeScreenContent(
         
         // Floating Bottom Bar
         FloatingBottomBar(
-            batteryLevel = uiState.batteryLevelText,
-            showLowBatteryWarning = uiState.showLowBatteryWarning,
+            uiState = uiState,
             onShareClick = { onEvent(HomeEvent.ShareAchievement) },
             modifier = Modifier.align(Alignment.BottomCenter)
         )
@@ -204,7 +214,7 @@ private fun HomeScreenContent(
 }
 
 @Composable
-private fun TopContentCard(
+private fun TodayCountCard(
     currentCount: Int,
     targetCount: Int,
     modifier: Modifier = Modifier
@@ -218,21 +228,7 @@ private fun TopContentCard(
         Column(
             modifier = Modifier.padding(vertical = 24.dp)
         ) {
-            // Header message
-            Text(
-                text = stringResource(id = R.string.home_header_message),
-                style = MaterialTheme.typography.headlineSmall.copy(
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                ),
-                color = Text_Primary,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
-            
-            Spacer(modifier = Modifier.height(32.dp))
-            
-            // Count and Progress Row with Divider
+// Count and Progress Row with Divider
             Row(
                 modifier = Modifier.fillMaxWidth().height(120.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
@@ -277,7 +273,7 @@ private fun TopContentCard(
                     modifier = Modifier.weight(1f).fillMaxHeight()
                 ) {
                     CircularProgress(
-                        current = 420/*currentCount*/,
+                        current = currentCount,
                         target = targetCount,
                         modifier = Modifier.size(120.dp),
                         showText = true
@@ -291,6 +287,7 @@ private fun TopContentCard(
 @Composable
 private fun WishRegistrationPrompt(
     onClick: () -> Unit,
+    remainingCount: Int = 3,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -329,6 +326,18 @@ private fun WishRegistrationPrompt(
                 lineHeight = 20.sp
             )
             
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Text(
+                text = "${remainingCount}개를 더 등록할 수 있어요",
+                style = MaterialTheme.typography.bodySmall.copy(
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Normal
+                ),
+                color = Purple_Medium,
+                textAlign = TextAlign.Center
+            )
+            
             Spacer(modifier = Modifier.height(32.dp))
             
             Button(
@@ -354,63 +363,25 @@ private fun WishRegistrationPrompt(
     }
 }
 
+
+
 @Composable
-private fun WishCard(
-    wishText: String,
-    date: String,
-    count: Int,
-    onClick: () -> Unit,
+private fun WishListSection(
+    recentRecords: List<DailyRecord>,
+    onWishClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Surface(
+    Column(
+        verticalArrangement = Arrangement.spacedBy(10.dp),
         modifier = modifier
-            .fillMaxWidth()
-            .clickable { onClick() },
-        shape = RoundedCornerShape(5.dp),
-        color = Color.White,
-        shadowElevation = 2.dp
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            Text(
-                text = wishText,
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium
-                ),
-                color = Color(0xFF333333),
-                maxLines = 2,
-                lineHeight = 20.sp
+        recentRecords.take(1).forEach { record ->
+            WishCard(
+                wishText = record.wishText,
+                onClick = {
+                    onWishClick(record.dateString)
+                }
             )
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            Row(
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    text = date,
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Normal
-                    ),
-                    color = Color(0xFF999999)
-                )
-                
-                Text(
-                    text = "${count}회",
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    ),
-                    color = Purple_Medium
-                )
-            }
         }
     }
 }
@@ -474,48 +445,19 @@ private fun ReportCard(
                 modifier = Modifier.padding(bottom = 16.dp)
             )
             
-            if (uiState.hasRecentRecords) {
-                // Show top 3 wishes as fixed cards
-                val topWishes = uiState.recentRecords.take(3)
-                
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    topWishes.forEach { record ->
-                        WishCard(
-                            wishText = record.wishText,
-                            date = record.dateString,
-                            count = record.totalCount,
-                            onClick = {
-                                onEvent(HomeEvent.NavigateToDetail(record.dateString))
-                            }
-                        )
-                    }
-                }
-            } else {
-                // Empty state
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = stringResource(id = R.string.empty_state_title),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Text_Secondary
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = stringResource(id = R.string.empty_state_subtitle),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Text_Tertiary
-                        )
-                    }
-                }
+            // Report content (wish list moved to top section)
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+            ) {
+                Text(
+                    text = "이전 WISH 데이터가 없습니다",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Text_Secondary,
+                    textAlign = TextAlign.Center
+                )
             }
         }
     }
@@ -523,8 +465,7 @@ private fun ReportCard(
 
 @Composable
 private fun FloatingBottomBar(
-    batteryLevel: String,
-    showLowBatteryWarning: Boolean,
+    uiState: HomeUiState,
     onShareClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -541,25 +482,31 @@ private fun FloatingBottomBar(
                 .padding(horizontal = 20.dp, vertical = 30.dp)
         ) {
             // Battery status
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_battery),
-                    contentDescription = stringResource(id = R.string.battery_description),
-                    tint = if (showLowBatteryWarning) Color.Red else Text_Secondary,
-                    modifier = Modifier.size(width = 37.dp, height = 21.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = if (batteryLevel.isEmpty() || batteryLevel == "--") "76%" else batteryLevel,
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.Medium
-                    ),
-                    color = if (showLowBatteryWarning) Color.Red else Text_Secondary
-                )
+            // Battery level display - only show when connected and available
+            if (uiState.shouldShowBatteryLevel) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_battery),
+                        contentDescription = stringResource(id = R.string.battery_description),
+                        tint = if (uiState.batteryLevel != null && uiState.batteryLevel!! < 20) Color.Red else Text_Secondary,
+                        modifier = Modifier.size(width = 37.dp, height = 21.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "${uiState.batteryLevel ?: 0}%",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Medium
+                        ),
+                        color = if (showLowBatteryWarning) Color.Red else Text_Secondary
+                    )
+                }
+            } else {
+                // Empty space when battery not available
+                Spacer(modifier = Modifier.weight(1f))
             }
             
             // Share button
@@ -602,9 +549,9 @@ private fun HomeScreenPreview() {
     }
 }
 
-@Preview(showBackground = true, name = "Empty State")
+@Preview(showBackground = true, name = "Zero Wishes State")
 @Composable
-private fun HomeScreenEmptyPreview() {
+private fun HomeScreenZeroWishesPreview() {
     WishRingTheme {
         HomeScreenContent(
             uiState = HomeViewState(
@@ -613,6 +560,109 @@ private fun HomeScreenEmptyPreview() {
                 recentRecords = emptyList(),
                 deviceBatteryLevel = 15,
                 bleConnectionState = BleConnectionState.DISCONNECTED
+            ),
+            onEvent = { /* Preview - no action */ }
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "One Wish With Button")
+@Composable
+private fun HomeScreenOneWishWithButtonPreview() {
+    WishRingTheme {
+        HomeScreenContent(
+            uiState = HomeViewState(
+                isLoading = false,
+                todayWishCount = null,
+                recentRecords = generateDummyRecords().take(1),
+                deviceBatteryLevel = 80,
+                bleConnectionState = BleConnectionState.CONNECTED
+            ),
+            onEvent = { /* Preview - no action */ }
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Two Wishes With Button")
+@Composable
+private fun HomeScreenTwoWishesWithButtonPreview() {
+    WishRingTheme {
+        HomeScreenContent(
+            uiState = HomeViewState(
+                isLoading = false,
+                todayWishCount = null,
+                recentRecords = generateDummyRecords().take(2),
+                deviceBatteryLevel = 60,
+                bleConnectionState = BleConnectionState.CONNECTED
+            ),
+            onEvent = { /* Preview - no action */ }
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "One Wish 100% Complete")
+@Composable
+private fun HomeScreenOneWishCompletePreview() {
+    WishRingTheme {
+        HomeScreenContent(
+            uiState = HomeViewState(
+                isLoading = false,
+                todayWishCount = WishCount(
+                    date = "2024-01-15",
+                    totalCount = 1000, // 목표 달성
+                    wishText = "매일 운동하기",
+                    targetCount = 1000,
+                    isCompleted = true,
+                    createdAt = System.currentTimeMillis(),
+                    updatedAt = System.currentTimeMillis()
+                ),
+                recentRecords = generateDummyRecords().take(1),
+                deviceBatteryLevel = 85,
+                bleConnectionState = BleConnectionState.CONNECTED
+            ),
+            onEvent = { /* Preview - no action */ }
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Long Wish Text")
+@Composable
+private fun HomeScreenLongWishTextPreview() {
+    WishRingTheme {
+        HomeScreenContent(
+            uiState = HomeViewState(
+                isLoading = false,
+                todayWishCount = null,
+                recentRecords = listOf(
+                    DailyRecord(
+                        date = java.time.LocalDate.now(),
+                        totalCount = 750,
+                        wishText = "나는 매일 아침 일찍 일어나서 운동을 하고, 건강한 아침 식사를 먹고, 독서를 통해 새로운 지식을 습득하며, 가족과 소중한 시간을 보내고, 일에서도 최선을 다하여 더 나은 내가 되기 위해 끊임없이 노력하고 성장하는 사람이 되고 싶다.",
+                        targetCount = 1000,
+                        isCompleted = false
+                    )
+                ),
+                deviceBatteryLevel = 70,
+                bleConnectionState = BleConnectionState.CONNECTED
+            ),
+            onEvent = { /* Preview - no action */ }
+        )
+    }
+}
+
+
+
+@Preview(showBackground = true, name = "Three Wishes State")
+@Composable
+private fun HomeScreenThreeWishesPreview() {
+    WishRingTheme {
+        HomeScreenContent(
+            uiState = HomeViewState(
+                isLoading = false,
+                todayWishCount = null,
+                recentRecords = generateDummyRecords().take(3),
+                deviceBatteryLevel = 90,
+                bleConnectionState = BleConnectionState.CONNECTED
             ),
             onEvent = { /* Preview - no action */ }
         )

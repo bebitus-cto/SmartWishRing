@@ -4,7 +4,7 @@
     <!-- Home Screen -->
     <string name="home_header_message">나는 매일 성장하고 있다</string>
     <string name="todays_count">Today\'s Count</string>
-    <string name="wish_button_text">위시(Wish)</string>
+    <string name="wish_button_text">WISH 추가하기</string>
     <string name="wish_report_title">내일을 만드는 WISH 리포트</string>
     <string name="empty_state_title">아직 기록이 없습니다</string>
     <string name="empty_state_subtitle">위시 버튼을 눌러 목표를 설정해보세요!</string>

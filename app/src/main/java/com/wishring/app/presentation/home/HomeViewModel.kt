@@ -104,13 +104,8 @@ class HomeViewModel @Inject constructor(
                     checkAndShowCompletionAnimation()
                 }
 
-                // Auto-connect BLE if enabled
-                viewModelScope.launch {
-                    if (preferencesRepository.isBleAutoConnectEnabled()) {
-                        val lastDevice = preferencesRepository.getLastBleDeviceAddress()
-                        lastDevice?.let { connectBleDevice(it) }
-                    }
-                }
+                // Start BLE Auto Connect Service
+                startBleAutoConnectService()
 
             } catch (e: Exception) {
                 updateState {
@@ -119,6 +114,25 @@ class HomeViewModel @Inject constructor(
                         error = e.message ?: "데이터를 불러오는 중 오류가 발생했습니다"
                     )
                 }
+            }
+        }
+    }
+
+    /**
+     * 자동 BLE 서비스 시작
+     */
+    private fun startBleAutoConnectService() {
+        viewModelScope.launch {
+            try {
+                // BLE 자동 연결이 활성화된 경우에만 서비스 시작
+                if (preferencesRepository.isBleAutoConnectEnabled()) {
+                    com.wishring.app.ble.BleAutoConnectService.startService(
+                        context = null // Context는 Service에서 ApplicationContext로 받음
+                    )
+                    Log.d("HomeViewModel", "BLE Auto Connect Service started")
+                }
+            } catch (e: Exception) {
+                Log.e("HomeViewModel", "Failed to start BLE service", e)
             }
         }
     }

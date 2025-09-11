@@ -1,19 +1,21 @@
 package com.wishring.app.presentation.wishinput
 
+import com.wishring.app.presentation.wishinput.model.WishItem
+
 /**
  * ViewState for WishInput screen
- * Represents the UI state of wish input
+ * Represents the UI state of wish input (supports multiple wishes)
  */
 data class WishInputViewState(
     val isLoading: Boolean = false,
-    val wishText: String = "",
-    val targetCount: Int = 1000,
+    val wishes: List<WishItem> = listOf(WishItem.createEmpty()),
     val date: String = "",
     val isEditMode: Boolean = false,
     val existingRecord: Boolean = false,
     val isSaving: Boolean = false,
     val error: String? = null,
     val showDeleteConfirmation: Boolean = false,
+    val maxWishCount: Int = 3,
     val suggestedWishes: List<String> = listOf(
         "나는 매일 성장하고 있다",
         "나는 충분히 잘하고 있다",
@@ -22,33 +24,38 @@ data class WishInputViewState(
         "나는 강하고 건강하다"
     ),
     val showSuggestions: Boolean = false,
-    val isWishValid: Boolean = false,
     val maxWishLength: Int = 100,
     val minTargetCount: Int = 1,
     val maxTargetCount: Int = 10000,
     val showTargetCountPicker: Boolean = false
 ) {
     /**
-     * Check if save is enabled
+     * Check if save is enabled (at least one valid wish)
      */
     val isSaveEnabled: Boolean
-        get() = wishText.isNotBlank() && targetCount > 0 && !isSaving
+        get() = wishes.any { it.isValid } && !isSaving
     
     /**
-     * Remaining character count
+     * Check if can add more wishes
      */
-    val remainingCharacters: Int
-        get() = maxWishLength - wishText.length
+    val canAddMoreWishes: Boolean
+        get() = wishes.size < maxWishCount
     
     /**
-     * Character count display
+     * Check if can remove wishes
      */
-    val characterCountDisplay: String
-        get() = "${wishText.length}/$maxWishLength"
+    val canRemoveWishes: Boolean
+        get() = wishes.size > 1
     
     /**
-     * Target count display
+     * Get count of valid wishes
      */
-    val targetCountDisplay: String
-        get() = "$targetCount 회"
+    val validWishCount: Int
+        get() = wishes.count { it.isValid }
+    
+    /**
+     * Check if maximum wishes reached
+     */
+    val isMaxWishesReached: Boolean
+        get() = wishes.size >= maxWishCount
 }
