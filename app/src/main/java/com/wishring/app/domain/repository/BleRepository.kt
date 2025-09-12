@@ -404,6 +404,20 @@ interface BleRepository {
      * @return Flow of device status
      */
     fun subscribeToDeviceStatus(): Flow<DeviceStatus>
+    
+    // ====== MRD SDK Counter Integration ======
+    
+    /**
+     * Observable counter increment events from MRD SDK
+     * Each emission represents a single +1 increment from the ring
+     */
+    val counterIncrements: Flow<Int>
+    
+    /**
+     * Request battery level update via MRD SDK
+     * Result will be available through subscribeToBatteryLevel()
+     */
+    suspend fun requestBatteryUpdate(): Result<Unit>
 }
 
 /**
