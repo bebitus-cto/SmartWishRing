@@ -47,8 +47,8 @@
 ```kotlin
 // Build Configuration
 minSdk = 26           // Android 8.0 (Oreo)
-targetSdk = 34        // Android 14
-compileSdk = 34
+targetSdk = 35       // Android 15
+compileSdk = 35
 
 // Core Libraries
 Kotlin = "1.9.22"
@@ -108,58 +108,76 @@ DataStore = "1.0.0"
 
 ---
 
-## 4. SDK 통합 가이드
+## 4. MRD SDK 통합 가이드
 
-### 4.1 공장 SDK 개요
+### 4.1 Manridy SDK 개요
 
-WishRing 디바이스 제조사에서 제공하는 Android SDK를 사용합니다.
+WishRing 디바이스는 Manridy(MRD) SDK를 통해 연동됩니다. UUID 직접 관리 없이 고수준 명령어로 통신합니다.
 
 | 구성 요소 | 형태 | 용도 |
 |----------|------|------|
-| **WishRing SDK** | AAR 라이브러리 | BLE 통신, 디바이스 관리 |
-| **API 문서** | PDF | 메서드, 콜백, 에러 코드 |
-| **샘플 코드** | Java/Kotlin | 연동 예제 |
+| **MRD SDK** | AAR 라이브러리 (libs/mrd_xxx.aar) | 디바이스 통신, 명령어 처리 |
+| **SDK 문서** | PDF | SystemEnum, MrdReadEnum, 콜백 가이드 |
+| **Demo 코드** | Java/Kotlin | 연동 패턴 예제 |
 
-### 4.2 SDK 주요 기능
+### 4.2 MRD SDK 주요 기능
 
-#### BLE 연결 관리
+#### 고수준 명령어 시스템
 ```kotlin
-// SDK 제공 예상 API (실제 문서 확인 필요)
-WishRingManager.getInstance()
-    .startScan()
-    .connect(device)
-    .registerCounterCallback { count -> 
-        // 카운터 증가 이벤트
+// MRD SDK 실제 API 패턴
+Manridy.getMrdSend().getSystem(SystemEnum.battery, 1)      // 배터리 조회
+Manridy.getMrdSend().getSystem(SystemEnum.brightness, 1)   // 밝기 설정
+Manridy.getMrdSend().getSystem(SystemEnum.firmware, 1)     // 펌웨어 정보
+
+// 콜백 등록
+Manridy.setOnMrdReadListener { mrdReadEnum, data ->
+    when (mrdReadEnum) {
+        MrdReadEnum.HEART -> handleHeartData(data)
+        MrdReadEnum.BP -> handleBatteryData(data) 
+        MrdReadEnum.RESET -> handleResetEvent(data)
     }
-    .registerBatteryCallback { level ->
-        // 배터리 상태 변경
-    }
-    .registerResetCallback { previousCount ->
-        // 리셋 이벤트 (이전 카운트 포함)
-    }
+}
 ```
 
-#### 데이터 동기화
-- **실시간 동기화**: 디바이스 → 앱 (BLE)
-- **오프라인 처리**: 앱 로컬 DB에 누적 저장
-- **재연결 시**: 증분 데이터만 합산 (중복 방지)
+#### 데이터 수신 패턴
+- **콜백 기반**: MrdReadEnum으로 데이터 타입 구분
+- **실시간 처리**: 디바이스 → SDK 콜백 → 앱 Flow
+- **상태 관리**: 연결/해제 상태 자동 관리
 
 ### 4.3 통합 요구사항
 
 #### Gradle 의존성
 ```gradle
 dependencies {
-    implementation files('libs/wishring-sdk-1.0.0.aar')
-    // 또는 Maven Repository (확인 필요)
-    implementation 'com.wishring:sdk:1.0.0'
+    implementation files('libs/sdk_mrd_xxx.aar')
+    
+    // BLE 기본 라이브러리 (SDK 내부 사용)
+    implementation 'no.nordicsemi.android:ble:2.7.0'
 }
 ```
 
 #### 권한 설정
 ```xml
-<!-- 기본 BLE 권한 외 SDK 전용 권한 (확인 필요) -->
-<uses-permission android:name="com.wishring.permission.DEVICE_ACCESS" />
+<!-- BLE 기본 권한 (SDK 요구사항) -->
+<uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 ```
+
+#### 초기화 패턴
+```kotlin
+// Application 클래스에서 초기화
+class WishRingApplication : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        
+        // MRD SDK 초기화
+        Manridy.init(this)
+        
+        // 콜백 등록
+        setupMrdCallbacks()
+    }
+}
 
 ---
 
@@ -764,71 +782,93 @@ abstract class BaseActivity<VM : ViewModel> : ComponentActivity() {
 
 ---
 
-## 8. BLE 통신 사양
+## 8. MRD SDK 통신 사양
 
-### 8.1 통신 프로토콜
+### 8.1 고수준 통신 프로토콜
 
-#### Service & Characteristics
-| UUID | 용도 | 속성 | 데이터 형식 |
-|------|------|------|------------|
-| 0x fff0 | Main Service | - | - |
-| 0x fff1 | Counter | Notify | Int32 (4 bytes, LE) |
-| 0x fff2 | Battery | Read/Notify | UInt8 (0-100) |
-| 0x fff3 | Reset Signal | Notify | UInt8 (0x01) |
+#### SystemEnum 명령어 체계
+| 명령어 | 용도 | 파라미터 | 응답 |
+|-------|------|---------|------|
+| SystemEnum.battery | 배터리 조회 | 1 (조회) | MrdReadEnum.BP |
+| SystemEnum.brightness | 밝기 설정 | 0-100 | 상태 확인 |
+| SystemEnum.firmware | 펌웨어 정보 | 1 (조회) | 버전 정보 |
+| SystemEnum.reset | 디바이스 리셋 | 1 (실행) | MrdReadEnum.RESET |
 
-#### 데이터 파싱
+#### MrdReadEnum 콜백 체계
 ```kotlin
-// Counter 데이터 (Little Endian)
-fun parseCounter(bytes: ByteArray): Int {
-    return ByteBuffer.wrap(bytes)
-        .order(ByteOrder.LITTLE_ENDIAN)
-        .getInt()
-}
-
-// Battery 데이터
-fun parseBattery(bytes: ByteArray): Int {
-    return bytes[0].toInt() and 0xFF
+// SDK 콜백 데이터 파싱
+Manridy.setOnMrdReadListener { mrdReadEnum, data ->
+    when (mrdReadEnum) {
+        MrdReadEnum.HEART -> {
+            // 카운터 데이터 (심박수 채널을 카운터로 활용)
+            val count = parseCounterData(data)
+            handleCounterIncrement(count)
+        }
+        MrdReadEnum.BP -> {
+            // 배터리 데이터 (혈압 채널을 배터리로 활용)
+            val batteryLevel = parseBatteryData(data)
+            handleBatteryUpdate(batteryLevel)
+        }
+        MrdReadEnum.RESET -> {
+            // 리셋 이벤트
+            val previousCount = parseResetData(data)
+            handleResetEvent(previousCount)
+        }
+    }
 }
 ```
 
-### 8.2 연결 시나리오
+### 8.2 MRD SDK 연결 시나리오
 
-#### 초기 연결
-1. BLE 권한 확인
-2. 스캔 시작 (10초 타임아웃)
-3. WISH RING 디바이스 필터링
-4. GATT 연결
-5. Service Discovery
-6. Notification 등록
+#### 초기 연결 (SDK 관리)
+1. MRD SDK 초기화
+2. 콜백 리스너 등록
+3. SDK 자동 디바이스 검색
+4. 연결 상태 콜백 수신
+5. 데이터 수신 준비 완료
 
-#### 재연결 로직
-1. 연결 끊김 감지
-2. 3초 대기
-3. 자동 재연결 시도 (최대 3회)
-4. 실패 시 수동 연결 대기
+#### 재연결 로직 (SDK 자동 처리)
+1. SDK가 연결 끊김 자동 감지
+2. 내부 재연결 로직 실행
+3. 연결 상태 변경 콜백 전달
+4. 앱에서 UI 상태만 업데이트
 
-### 8.3 백그라운드 처리
+### 8.3 MRD SDK 백그라운드 처리
 
-#### Foreground Service
+#### MRD 통합 Foreground Service
 ```kotlin
-class BleService : Service() {
-    // Notification Channel ID
+class MrdBleService : Service() {
     companion object {
-        const val CHANNEL_ID = "wish_ring_ble"
+        const val CHANNEL_ID = "wish_ring_mrd"
         const val NOTIFICATION_ID = 1001
     }
     
-    // Service 유지
-    override fun onStartCommand(): Int {
+    private lateinit var mrdDataSource: MrdSdkDataSource
+    
+    override fun onCreate() {
+        super.onCreate()
+        // MRD SDK 서비스 레벨 초기화
+        mrdDataSource = MrdSdkDataSource()
+        mrdDataSource.initialize()
+    }
+    
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        startMrdConnection()
         return START_STICKY
+    }
+    
+    private fun startMrdConnection() {
+        // SDK 백그라운드 연결 유지
+        mrdDataSource.startConnection()
     }
 }
 ```
 
 #### 권한 요구사항
-- Android 12+: BLUETOOTH_SCAN, BLUETOOTH_CONNECT
+- Android 12+: BLUETOOTH_SCAN, BLUETOOTH_CONNECT  
 - Android 11 이하: ACCESS_FINE_LOCATION
 - 공통: FOREGROUND_SERVICE, POST_NOTIFICATIONS
+- MRD SDK 전용 권한 (필요 시)
 
 ---
 

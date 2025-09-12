@@ -1,5 +1,6 @@
 package com.wishring.app.presentation.component
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -25,6 +26,7 @@ import kotlinx.coroutines.delay
  * Custom Number Picker Component
  * Compose-native wheel/roulette picker for target count selection
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun CustomNumberPicker(
     selectedValue: Int,

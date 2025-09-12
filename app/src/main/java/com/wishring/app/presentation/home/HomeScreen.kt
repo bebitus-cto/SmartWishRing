@@ -465,7 +465,7 @@ private fun ReportCard(
 
 @Composable
 private fun FloatingBottomBar(
-    uiState: HomeUiState,
+    uiState: HomeViewState,
     onShareClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -491,17 +491,17 @@ private fun FloatingBottomBar(
                     Icon(
                         painter = painterResource(id = R.drawable.ic_battery),
                         contentDescription = stringResource(id = R.string.battery_description),
-                        tint = if (uiState.batteryLevel != null && uiState.batteryLevel!! < 20) Color.Red else Text_Secondary,
+                        tint = if (uiState.deviceBatteryLevel != null && uiState.deviceBatteryLevel!! < 20) Color.Red else Text_Secondary,
                         modifier = Modifier.size(width = 37.dp, height = 21.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = "${uiState.batteryLevel ?: 0}%",
+                        text = "${uiState.deviceBatteryLevel ?: 0}%",
                         style = MaterialTheme.typography.bodySmall.copy(
                             fontSize = 8.sp,
                             fontWeight = FontWeight.Medium
                         ),
-                        color = if (showLowBatteryWarning) Color.Red else Text_Secondary
+                        color = if (uiState.showLowBatteryWarning) Color.Red else Text_Secondary
                     )
                 }
             } else {

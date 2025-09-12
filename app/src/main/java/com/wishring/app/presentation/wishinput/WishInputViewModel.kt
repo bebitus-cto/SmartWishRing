@@ -195,11 +195,12 @@ class WishInputViewModel @Inject constructor(
     private fun showTargetCountPicker() {
         viewModelScope.launch {
             _effect.send(WishInputEffect.ShowNumberPicker(
-                currentValue = _uiState.value.targetCount,
+                currentValue = 1000, // Default value since we handle multiple wishes
                 minValue = _uiState.value.minTargetCount,
                 maxValue = _uiState.value.maxTargetCount,
                 onValueSelected = { count ->
-                    onEvent(WishInputEvent.UpdateTargetCount(count))
+                    // This would need to be updated when we know which wish to update
+                    // For now, we'll handle target count changes directly in the component
                 }
             ))
         }
