@@ -357,7 +357,7 @@ class BleAutoConnectService : Service() {
         return NotificationCompat.Builder(this, BleConstants.NOTIFICATION_CHANNEL_ID)
             .setContentTitle(title)
             .setContentText(content)
-            .setSmallIcon(icon)
+            .setSmallIcon(icon as Int)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
             .setAutoCancel(false)

@@ -19,6 +19,7 @@ import android.util.Log
 import com.wishring.app.core.util.Constants
 import com.wishring.app.domain.repository.*
 import com.wishring.app.domain.model.*
+import com.wishring.app.domain.model.SystemInfoType
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.*
@@ -762,5 +763,56 @@ class BleRepositoryImpl @Inject constructor(
     
     override fun subscribeToDeviceStatus(): Flow<DeviceStatus> {
         return mrdProtocolAdapter.subscribeToDeviceStatus()
+    }
+    
+    // ====== MRD SDK Counter Integration ======
+    
+    /**
+     * Observable counter increment events from MRD SDK
+     * Each emission represents a single +1 increment from the ring
+     */
+    override val counterIncrements: Flow<Int> = callbackFlow {
+        // Register MRD SDK callback for HEART events (counter +1)
+        // TODO: Replace with actual MRD SDK callback registration
+        // Manridy.getInstance().setMrdReadCallBack { type, data ->
+        //     when (type) {
+        //         MrdReadEnum.HEART -> {
+        //             trySend(1) // Each HEART callback = +1 increment
+        //         }
+        //     }
+        // }
+        
+        // Mock implementation for now - emit test increments
+        // Remove this when actual SDK is available
+        kotlinx.coroutines.delay(1000L)
+        repeat(Int.MAX_VALUE) {
+            kotlinx.coroutines.delay(3000L) // Mock: increment every 3 seconds
+            trySend(1)
+        }
+        
+        awaitClose { 
+            // TODO: Unregister callback when actual SDK is available
+        }
+    }
+    
+    /**
+     * Request battery level update via MRD SDK
+     * Result will be available through subscribeToBatteryLevel()
+     */
+    override suspend fun requestBatteryUpdate(): Result<Unit> {
+        return try {
+            if (!_connectionState.value.isConnected()) {
+                Result.failure(IllegalStateException("Device not connected"))
+            } else {
+                // TODO: Replace with actual MRD SDK call
+                // Manridy.getMrdSend().getSystem(SystemEnum.battery, 1)
+                
+                // Mock implementation - request system info
+                mrdProtocolAdapter.getSystemInfo(SystemInfoType.BATTERY)
+                Result.success(Unit)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 }

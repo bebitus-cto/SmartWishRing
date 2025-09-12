@@ -3,6 +3,7 @@ package com.wishring.app.ble
 import android.content.Context
 import android.util.Log
 import com.wishring.app.domain.model.*
+import com.wishring.app.domain.model.SystemInfoType
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.*

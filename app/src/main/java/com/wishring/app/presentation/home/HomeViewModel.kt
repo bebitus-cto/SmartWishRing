@@ -14,6 +14,9 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import javax.inject.Inject
+import android.util.Log
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 
 /**
  * ViewModel for Home screen
@@ -21,6 +24,7 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class HomeViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val wishCountRepository: WishCountRepository,
     private val bleRepository: BleRepository,
     private val preferencesRepository: PreferencesRepository
@@ -127,7 +131,7 @@ class HomeViewModel @Inject constructor(
                 // BLE 자동 연결이 활성화된 경우에만 서비스 시작
                 if (preferencesRepository.isBleAutoConnectEnabled()) {
                     com.wishring.app.ble.BleAutoConnectService.startService(
-                        context = null // Context는 Service에서 ApplicationContext로 받음
+                        context = context
                     )
                     Log.d("HomeViewModel", "BLE Auto Connect Service started")
                 }
@@ -255,16 +259,28 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun observeBleButtonPress() {
-        bleRepository.subscribeToButtonPress()
-            .onEach { event ->
-                handleDeviceButtonPress(event.pressCount)
+        // Updated to use MRD SDK counter increments
+        viewModelScope.launch {
+            bleRepository.counterIncrements.collect { increment ->
+                handleMrdCounterIncrement(increment)
             }
-            .launchIn(viewModelScope)
+        }
     }
 
+    private fun handleMrdCounterIncrement(increment: Int) {
+        // MRD SDK sends individual +1 increments
+        incrementCount(increment)
+        sendEffect(HomeEffect.ShowToast("WISH RING에서 +$increment"))
+        
+        // Update battery level request after activity
+        viewModelScope.launch {
+            bleRepository.requestBatteryUpdate()
+        }
+    }
+    
+    // Keep legacy method for compatibility
     private fun handleDeviceButtonPress(pressCount: Int) {
-        incrementCount(pressCount)
-        sendEffect(HomeEffect.ShowToast("디바이스에서 $pressCount 카운트 추가"))
+        handleMrdCounterIncrement(pressCount)
     }
 
     private fun startBleScanning() {

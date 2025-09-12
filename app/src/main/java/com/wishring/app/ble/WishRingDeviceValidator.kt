@@ -3,6 +3,8 @@ package com.wishring.app.ble
 import android.bluetooth.BluetoothDevice
 import android.util.Log
 import com.wishring.app.di.IoDispatcher
+import com.wishring.app.domain.repository.BleRepository
+import com.wishring.app.domain.model.SystemInfoType
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -16,6 +18,7 @@ import javax.inject.Singleton
 @Singleton
 class WishRingDeviceValidator @Inject constructor(
     private val mrdProtocolAdapter: MrdProtocolAdapter,
+    private val bleRepository: BleRepository,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) {
     
@@ -146,8 +149,8 @@ class WishRingDeviceValidator @Inject constructor(
                     Log.d(TAG, "SDK communication successful")
                     
                     // 추가 정보 수집
-                    val batteryLevel = mrdProtocolAdapter.getBatteryLevel()
-                    val firmwareVersion = mrdProtocolAdapter.getFirmwareVersion()
+                    val batteryLevel = bleRepository.getBatteryLevel()
+                    val firmwareVersion = bleRepository.getFirmwareVersion()
                     
                     SdkValidationResult(
                         success = true,
@@ -207,9 +210,9 @@ class WishRingDeviceValidator @Inject constructor(
     suspend fun getDeviceDetailInfo(device: BluetoothDevice): DeviceDetailInfo? {
         return withContext(ioDispatcher) {
             try {
-                val batteryLevel = mrdProtocolAdapter.getBatteryLevel()
-                val firmwareVersion = mrdProtocolAdapter.getFirmwareVersion()
-                val systemInfo = mrdProtocolAdapter.getSystemInfo(SystemInfoType.DEVICE_INFO)
+                val batteryLevel = bleRepository.getBatteryLevel()
+                    val firmwareVersion = bleRepository.getFirmwareVersion()
+                val systemInfo = mrdProtocolAdapter.getSystemInfo(SystemInfoType.MANUFACTURER)
                 
                 DeviceDetailInfo(
                     deviceName = device.name ?: "Unknown",

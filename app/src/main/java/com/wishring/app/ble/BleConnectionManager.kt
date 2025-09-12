@@ -1,6 +1,7 @@
 package com.wishring.app.ble
 
 import android.bluetooth.*
+import android.os.ParcelUuid
 import android.bluetooth.le.*
 import android.content.Context
 import android.os.Handler
