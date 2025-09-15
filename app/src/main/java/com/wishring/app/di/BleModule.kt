@@ -2,7 +2,6 @@ package com.wishring.app.di
 
 import android.content.Context
 import com.wishring.app.ble.MrdProtocolAdapter
-
 import com.wishring.app.ble.BleRepositoryImpl
 import com.wishring.app.domain.repository.BleRepository
 import dagger.Binds
@@ -30,7 +29,6 @@ abstract class BleModule {
     ): BleRepository
     
     companion object {
-
         
         /**
          * Provide MRD Protocol Adapter

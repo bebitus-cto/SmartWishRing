@@ -158,7 +158,7 @@ class EndToEndScenarioTest {
             // Step 4: BLE 디바이스 스캔 및 연결
             coEvery { bleRepository.scanForDevices() } returns flowOf(
                 mockk {
-                    every { name } returns "WISH_RING_001"
+                    every { name } returns "MRD_001"
                     every { address } returns "00:11:22:33:44:55"
                 }
             )

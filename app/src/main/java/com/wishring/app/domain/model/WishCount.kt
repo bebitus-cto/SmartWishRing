@@ -3,6 +3,7 @@ package com.wishring.app.domain.model
 import com.wishring.app.core.util.Constants
 import com.wishring.app.core.util.DateUtils
 import com.wishring.app.data.local.database.entity.WishCountEntity
+import com.wishring.app.data.local.database.entity.WishData
 
 /**
  * Domain model for daily wish count
@@ -120,6 +121,7 @@ data class WishCount(
                 updatedAt = entity.updatedAt
             )
         }
+
     }
 }
 

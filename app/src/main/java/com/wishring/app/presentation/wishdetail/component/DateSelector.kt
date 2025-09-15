@@ -107,7 +107,7 @@ fun DateSelector(
     // Bottom divider
     Divider(
         modifier = Modifier.fillMaxWidth(),
-        thickness = BorderWidthThin,
+        thickness = 0.5.dp,
         color = MaterialTheme.colorScheme.outline
     )
 }

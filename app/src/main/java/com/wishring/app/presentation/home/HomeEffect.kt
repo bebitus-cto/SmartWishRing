@@ -1,7 +1,5 @@
 package com.wishring.app.presentation.home
 
-import com.wishring.app.domain.model.HealthDataType
-
 /**
  * Side effects for Home screen
  * Represents one-time UI actions
@@ -37,12 +35,7 @@ sealed class HomeEffect {
      */
     data class NavigateToDetail(val date: String) : HomeEffect()
     
-    /**
-     * Navigate to settings screen
-     */
-    object NavigateToSettings : HomeEffect()
-    
-    /**
+/**
      * Show BLE device picker
      * @param devices List of available devices
      */
@@ -57,6 +50,18 @@ sealed class HomeEffect {
     data class ShowShareSheet(val shareContent: ShareContent) : HomeEffect()
     
     /**
+     * Share image with Android intent
+     * @param imageFile Image file to share
+     * @param message Share message
+     * @param hashtags Hashtags to include
+     */
+    data class ShareImageWithIntent(
+        val imageFile: java.io.File,
+        val message: String,
+        val hashtags: String
+    ) : HomeEffect()
+    
+    /**
      * Play completion animation
      */
     object PlayCompletionAnimation : HomeEffect()
@@ -67,11 +72,7 @@ sealed class HomeEffect {
      */
     data class PlaySound(val soundType: SoundType) : HomeEffect()
     
-    /**
-     * Vibrate device
-     * @param pattern Vibration pattern
-     */
-    data class Vibrate(val pattern: VibrationPattern) : HomeEffect()
+
     
     /**
      * Show reset confirmation dialog
@@ -145,20 +146,50 @@ sealed class HomeEffect {
     ) : HomeEffect()
     
     /**
-     * Show ECG data
-     * @param ecgData ECG display data
+     * Enable Bluetooth (show system prompt)
      */
-    data class ShowEcgData(
-        val ecgData: EcgDisplayData
+    object EnableBluetooth : HomeEffect()
+    
+    /**
+     * Request Bluetooth permissions
+     */
+    object RequestBluetoothPermissions : HomeEffect()
+    
+    /**
+     * Show permission explanation dialog
+     * @param permissions List of denied permissions
+     * @param explanations Explanation messages for each permission
+     */
+    data class ShowPermissionExplanation(
+        val permissions: List<String>,
+        val explanations: Map<String, String>
     ) : HomeEffect()
     
     /**
-     * Show health detail dialog
-     * @param healthInfo Health detail information
+     * Show permission denied dialog with solutions
+     * @param deniedPermissions List of denied permissions
+     * @param solution Solution message
      */
-    data class ShowHealthDetailDialog(
-        val healthInfo: HealthDetailInfo
+    data class ShowPermissionDenied(
+        val deniedPermissions: List<String>,
+        val solution: String
     ) : HomeEffect()
+    
+
+    
+    /**
+     * Update bluetooth connection progress
+     * @param message Progress message to display
+     */
+    data class UpdateBluetoothProgress(
+        val message: String
+    ) : HomeEffect()
+    
+    /**
+     * Show connection success animation
+     */
+    object ShowConnectionSuccessAnimation : HomeEffect()
+
 }
 
 /**
@@ -192,13 +223,7 @@ enum class SoundType {
 /**
  * Vibration pattern enum
  */
-enum class VibrationPattern {
-    SHORT,
-    DOUBLE,
-    LONG,
-    SUCCESS,
-    ERROR
-}
+
 
 /**
  * Permission type enum
@@ -238,39 +263,3 @@ data class StreakAchievement(
     val isUnlocked: Boolean
 )
 
-/**
- * ECG display data
- */
-data class EcgDisplayData(
-    val data: ByteArray,
-    val heartRate: Int,
-    val timestamp: Long,
-    val quality: String
-) {
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (javaClass != other?.javaClass) return false
-        other as EcgDisplayData
-        return data.contentEquals(other.data) && heartRate == other.heartRate && timestamp == other.timestamp && quality == other.quality
-    }
-    
-    override fun hashCode(): Int {
-        var result = data.contentHashCode()
-        result = 31 * result + heartRate
-        result = 31 * result + timestamp.hashCode()
-        result = 31 * result + quality.hashCode()
-        return result
-    }
-}
-
-/**
- * Health detail information
- */
-data class HealthDetailInfo(
-    val type: HealthDataType,
-    val title: String,
-    val currentValue: String,
-    val additionalInfo: String? = null,
-    val timestamp: Long,
-    val quality: String
-)

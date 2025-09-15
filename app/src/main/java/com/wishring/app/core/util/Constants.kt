@@ -28,14 +28,14 @@ object Constants {
     const val BLE_RECONNECT_DELAY = 3000L // 3 seconds
     const val BLE_MAX_RECONNECT_ATTEMPTS = 3
     
-    // BLE Service UUIDs
-    const val BLE_SERVICE_UUID = "0000fff0-0000-1000-8000-00805f9b34fb"
-    const val BLE_COUNTER_CHAR_UUID = "0000fff1-0000-1000-8000-00805f9b34fb"
+    // BLE Service UUIDs - MRD SDK 실제 UUID
+    const val BLE_SERVICE_UUID = "f000efe0-0451-4000-0000-00000000b000"
+    const val BLE_COUNTER_CHAR_UUID = "f000efe3-0451-4000-0000-00000000b000"
     const val BLE_BATTERY_CHAR_UUID = "0000fff2-0000-1000-8000-00805f9b34fb"
     const val BLE_RESET_CHAR_UUID = "0000fff3-0000-1000-8000-00805f9b34fb"
     
-    // BLE Device Name
-    const val BLE_DEVICE_NAME_PREFIX = "WISHRING"
+    // BLE Device Name - removed fake device name filtering
+    // const val BLE_DEVICE_NAME_PREFIX = "WISHRING" // 가짜 기기명 제거됨
     
     // BLE Sync Configuration
     const val DEFAULT_BLE_SYNC_INTERVAL = 5 // minutes
@@ -51,7 +51,7 @@ object Constants {
         const val LAST_CONNECTED_DEVICE = "last_connected_device"
         const val DAILY_REMINDER_ENABLED = "daily_reminder_enabled"
         const val DAILY_REMINDER_TIME = "daily_reminder_time"
-        const val VIBRATION_ENABLED = "vibration_enabled"
+
         const val SOUND_ENABLED = "sound_enabled"
         const val AUTO_RECONNECT = "auto_reconnect"
         const val THEME_MODE = "theme_mode"
@@ -90,7 +90,7 @@ object Constants {
     const val MIN_WISH_TEXT_LENGTH = 1
     
     // Database
-    const val DATABASE_VERSION = 1
+    const val DATABASE_VERSION = 3
     const val TABLE_WISH_COUNTS = "wish_counts"
     const val TABLE_RESET_LOGS = "reset_logs"
     

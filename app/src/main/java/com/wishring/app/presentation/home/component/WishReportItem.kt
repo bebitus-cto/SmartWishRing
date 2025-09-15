@@ -101,23 +101,3 @@ fun WishReportItem(
     )
 }
 
-@Preview(showBackground = true)
-@Composable
-fun WishReportItemPreview() {
-    WishRingTheme {
-        Column {
-            WishReportItem(
-                wishText = "나는 어제보다 더 나은 내가 되고 있다.",
-                date = "2025-08-21",
-                count = 1000,
-                isCompleted = true
-            )
-            WishReportItem(
-                wishText = "매일 조금씩, 나는 내 가능성을 확장하고 있다.",
-                date = "2025-08-20",
-                count = 850,
-                isCompleted = false
-            )
-        }
-    }
-}

@@ -3,6 +3,7 @@ package com.wishring.app.presentation.home
 import androidx.lifecycle.viewModelScope
 import com.wishring.app.core.base.BaseViewModel
 import com.wishring.app.core.util.Constants
+import com.wishring.app.core.util.BlePermissionChecker
 import com.wishring.app.domain.repository.BleConnectionState
 import com.wishring.app.domain.repository.BleDevice
 import com.wishring.app.domain.repository.BleRepository
@@ -10,6 +11,7 @@ import com.wishring.app.domain.repository.ButtonPressEvent
 import com.wishring.app.domain.repository.PreferencesRepository
 import com.wishring.app.domain.repository.WishCountRepository
 import com.wishring.app.domain.model.*
+import com.wishring.app.domain.model.HealthDataType
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -27,7 +29,8 @@ class HomeViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val wishCountRepository: WishCountRepository,
     private val bleRepository: BleRepository,
-    private val preferencesRepository: PreferencesRepository
+    private val preferencesRepository: PreferencesRepository,
+    private val blePermissionChecker: BlePermissionChecker
 ) : BaseViewModel<HomeViewState, HomeEvent, HomeEffect>() {
 
     override val _uiState = MutableStateFlow(HomeViewState())
@@ -37,11 +40,13 @@ class HomeViewModel @Inject constructor(
         observeTodayWishCount()
         observeBleConnectionState()
         observeBleButtonPress()
-        observeHealthDataUpdates()
-        observeDeviceStatus()
+        
+        // 디버그 이벤트 히스토리 구독
+        observeDebugEventHistory()
     }
 
     override fun onEvent(event: HomeEvent) {
+        Log.d(TAG, "🎯 HomeEvent received: $event")
         when (event) {
             is HomeEvent.LoadData -> loadInitialData()
             is HomeEvent.RefreshData -> refreshData()
@@ -49,12 +54,16 @@ class HomeViewModel @Inject constructor(
             is HomeEvent.ResetCount -> showResetConfirmation(event.reason)
             is HomeEvent.NavigateToWishInput -> navigateToWishInput()
             is HomeEvent.NavigateToDetail -> navigateToDetail(event.date)
-            is HomeEvent.NavigateToSettings -> navigateToSettings()
+
             is HomeEvent.StartBleScanning -> startBleScanning()
             is HomeEvent.ConnectBleDevice -> connectBleDevice(event.deviceAddress)
             is HomeEvent.DisconnectBleDevice -> disconnectBleDevice()
             is HomeEvent.SyncWithDevice -> syncWithDevice()
+            is HomeEvent.SelectBleDevice -> selectBleDevice(event.deviceAddress)
+            is HomeEvent.DismissBleDevicePicker -> dismissBleDevicePicker()
             is HomeEvent.ShareAchievement -> shareAchievement()
+            is HomeEvent.ConfirmShare -> confirmShare(event.message, event.hashtags)
+            is HomeEvent.DismissShareDialog -> dismissShareDialog()
             is HomeEvent.ShowStreakDetails -> showStreakDetails()
             is HomeEvent.DismissError -> dismissError()
             is HomeEvent.HandleDeviceButtonPress -> handleDeviceButtonPress(event.pressCount)
@@ -63,19 +72,15 @@ class HomeViewModel @Inject constructor(
             is HomeEvent.ToggleCompletionAnimation -> toggleCompletionAnimation()
             is HomeEvent.RequestNotificationPermission -> requestNotificationPermission()
             is HomeEvent.RequestBlePermission -> requestBlePermission()
-
-            // MRD SDK 건강 데이터 이벤트 처리
-            is HomeEvent.LoadHealthData -> loadHealthData()
-            is HomeEvent.StartRealTimeHeartRate -> startRealTimeHeartRate()
-            is HomeEvent.StopRealTimeHeartRate -> stopRealTimeHeartRate()
-            is HomeEvent.StartRealTimeEcg -> startRealTimeEcg()
-            is HomeEvent.StopRealTimeEcg -> stopRealTimeEcg()
-            is HomeEvent.UpdateUserProfile -> updateUserProfile(event.userProfile)
-            is HomeEvent.SetSportTarget -> setSportTarget(event.steps)
-            is HomeEvent.SendAppNotification -> sendAppNotification(event.notification)
-            is HomeEvent.UpdateDeviceSettings -> updateDeviceSettings(event.units)
-            is HomeEvent.FindDevice -> findDevice()
-            is HomeEvent.ShowHealthDetails -> showHealthDetails(event.type)
+            is HomeEvent.EnableBluetooth -> enableBluetooth()
+            is HomeEvent.DismissPermissionExplanation -> dismissPermissionExplanation()
+            is HomeEvent.RequestPermissionsFromExplanation -> requestPermissionsFromExplanation()
+            is HomeEvent.DismissPermissionDenied -> dismissPermissionDenied()
+            is HomeEvent.OpenAppSettingsFromDialog -> openAppSettingsFromDialog()
+            
+            // ✅ 디버그 이벤트 처리
+            is HomeEvent.ToggleDebugPanel -> toggleDebugPanel()
+            is HomeEvent.ClearDebugHistory -> clearDebugHistory()
         }
     }
 
@@ -182,7 +187,7 @@ class HomeViewModel @Inject constructor(
 
                 // Play sound and vibrate
                 sendEffect(HomeEffect.PlaySound(SoundType.TAP))
-                sendEffect(HomeEffect.Vibrate(VibrationPattern.SHORT))
+
 
                 // Check if goal completed
                 if (updated.isCompleted && !currentState.todayWishCount?.isCompleted!!) {
@@ -228,7 +233,7 @@ class HomeViewModel @Inject constructor(
                 }
 
                 sendEffect(HomeEffect.ShowToast("카운트가 초기화되었습니다"))
-                sendEffect(HomeEffect.Vibrate(VibrationPattern.LONG))
+
 
             } catch (e: Exception) {
                 sendEffect(HomeEffect.ShowToast("초기화 실패: ${e.message}"))
@@ -245,14 +250,16 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun observeBleConnectionState() {
-        bleRepository.getConnectionState()
+        bleRepository.connectionState
             .onEach { connectionState ->
                 updateState { copy(bleConnectionState = connectionState) }
 
                 // Get battery level when connected
                 if (connectionState == BleConnectionState.CONNECTED) {
-                    val batteryLevel = bleRepository.getBatteryLevel()
-                    updateState { copy(deviceBatteryLevel = batteryLevel) }
+                    viewModelScope.launch {
+                        val batteryLevel = bleRepository.getBatteryLevel()
+                        updateState { copy(deviceBatteryLevel = batteryLevel) }
+                    }
                 }
             }
             .launchIn(viewModelScope)
@@ -270,7 +277,15 @@ class HomeViewModel @Inject constructor(
     private fun handleMrdCounterIncrement(increment: Int) {
         // MRD SDK sends individual +1 increments
         incrementCount(increment)
-        sendEffect(HomeEffect.ShowToast("WISH RING에서 +$increment"))
+        
+        // Show more user-friendly message
+        if (increment == 1) {
+            sendEffect(HomeEffect.ShowToast("WISH RING 버튼 누름 감지! ✨"))
+        } else {
+            sendEffect(HomeEffect.ShowToast("WISH RING에서 +$increment"))
+        }
+        
+
         
         // Update battery level request after activity
         viewModelScope.launch {
@@ -284,24 +299,62 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun startBleScanning() {
+        Log.d(TAG, "🔍 BLE 스캔 시작...")
         viewModelScope.launch {
-            val devices = mutableListOf<BleDevice>()
-
-            bleRepository.startScanning(timeout = 10000)
-                .collect { device ->
-                    devices.add(device)
+            try {
+                Log.d(TAG, "📡 BLE 권한 체크 중...")
+                
+                // 권한 확인
+                if (!blePermissionChecker.hasAllBlePermissions()) {
+                    Log.e(TAG, "❌ BLE 권한 없음!")
+                    sendEffect(HomeEffect.RequestBluetoothPermissions)
+                    return@launch
                 }
+                
+                Log.d(TAG, "✅ 권한 확인 완료, 스캔 시작...")
+                updateState { copy(isLoading = true) }
+                
+                val devices = mutableListOf<BleDevice>()
 
-            if (devices.isNotEmpty()) {
-                sendEffect(
-                    HomeEffect.ShowBleDevicePicker(
-                        devices = devices.map {
+                // 3초로 타임아웃 단축 (더 빠른 스캔)
+                bleRepository.startScanning(timeout = 3000)
+                    .collect { device ->
+                        Log.d(TAG, "🎯 기기 발견: ${device.name} (${device.address})")
+                        devices.add(device)
+                        
+                        // 실시간으로 기기 목록 업데이트 (모든 기기 동등하게)
+                        val deviceInfos = devices.map {
                             DeviceInfo(it.name, it.address, it.rssi)
+                        }.sortedByDescending { it.rssi } // RSSI 강한 순으로 정렬
+                        
+                        updateState {
+                            copy(
+                                showBleDevicePicker = true,
+                                availableBleDevices = deviceInfos,
+                                isLoading = devices.isEmpty() // 첫 기기 발견하면 로딩 중지
+                            )
                         }
-                    )
-                )
-            } else {
-                sendEffect(HomeEffect.ShowToast("디바이스를 찾을 수 없습니다"))
+                    }
+
+                Log.d(TAG, "📊 스캔 완료. 발견된 기기: ${devices.size}개")
+                updateState { copy(isLoading = false) }
+                
+                // 기기가 하나도 없을 때만 안내
+                if (devices.isEmpty()) {
+                    Log.w(TAG, "⚠️ 스캔 완료했지만 기기를 찾을 수 없음")
+                    sendEffect(HomeEffect.ShowToast("BLE 기기를 찾을 수 없습니다. 기기 전원을 확인해주세요."))
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ BLE 스캔 실패: ${e.message}", e)
+                updateState { copy(isLoading = false) }
+                
+                val errorMessage = when {
+                    e.message?.contains("BLUETOOTH") == true -> "블루투스를 켜주세요"
+                    e.message?.contains("LOCATION") == true -> "위치 서비스를 켜주세요"
+                    e.message?.contains("PERMISSION") == true -> "권한이 필요합니다"
+                    else -> "BLE 스캔 실패: ${e.message}"
+                }
+                sendEffect(HomeEffect.ShowToast(errorMessage))
             }
         }
     }
@@ -319,16 +372,29 @@ class HomeViewModel @Inject constructor(
 
                     // Get device info
                     val batteryLevel = bleRepository.getBatteryLevel()
-                    val firmwareVersion = bleRepository.getFirmwareVersion()
+                    // TODO: Implement when getFirmwareVersion is available in BleRepository
+                    val firmwareVersion = "1.0.0" // Mock firmware version
 
                     updateState {
                         copy(
                             bleConnectionState = BleConnectionState.CONNECTED,
-                            deviceBatteryLevel = batteryLevel
+                            deviceBatteryLevel = batteryLevel,
+                            bluetoothProgressMessage = "" // Clear progress message
                         )
                     }
 
+                    // Connection success feedback
+                    sendEffect(HomeEffect.PlaySound(SoundType.SUCCESS))
+
+                    sendEffect(HomeEffect.ShowConnectionSuccessAnimation)
                     sendEffect(HomeEffect.ShowToast(Constants.SuccessMessages.DEVICE_CONNECTED))
+                    
+                    // Show connection success animation for 2 seconds
+                    updateState { copy(showConnectionSuccessAnimation = true) }
+                    viewModelScope.launch {
+                        delay(2000)
+                        updateState { copy(showConnectionSuccessAnimation = false) }
+                    }
 
                     // Initial sync
                     syncWithDevice()
@@ -385,11 +451,36 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Select BLE device from picker and connect
+     */
+    private fun selectBleDevice(deviceAddress: String) {
+        updateState { 
+            copy(
+                showBleDevicePicker = false,
+                availableBleDevices = emptyList()
+            ) 
+        }
+        connectBleDevice(deviceAddress)
+    }
+
+    /**
+     * Dismiss BLE device picker dialog
+     */
+    private fun dismissBleDevicePicker() {
+        updateState { 
+            copy(
+                showBleDevicePicker = false,
+                availableBleDevices = emptyList()
+            ) 
+        }
+    }
+
     private fun handleGoalCompletion() {
         updateState { copy(showCompletionAnimation = true) }
         sendEffect(HomeEffect.PlayCompletionAnimation)
         sendEffect(HomeEffect.PlaySound(SoundType.SUCCESS))
-        sendEffect(HomeEffect.Vibrate(VibrationPattern.SUCCESS))
+
         sendEffect(HomeEffect.ShowToast(Constants.SuccessMessages.GOAL_ACHIEVED))
 
         // Send achievement notification if enabled
@@ -472,7 +563,8 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun navigateToSettings() {
-        sendEffect(HomeEffect.NavigateToSettings)
+        // TODO: Add NavigateToSettings to HomeEffect or use OpenAppSettings
+        sendEffect(HomeEffect.OpenAppSettings)
     }
 
     private fun handleBackgroundSync() {
@@ -502,411 +594,158 @@ class HomeViewModel @Inject constructor(
         sendEffect(HomeEffect.RequestPermission(PermissionType.BLUETOOTH))
     }
 
+    private fun enableBluetooth() {
+        viewModelScope.launch {
+            try {
+                updateState { copy(bluetoothProgressMessage = "블루투스 설정을 확인하는 중...") }
+                
+                // 1. 블루투스 지원 여부 확인
+                val bluetoothManager = context.getSystemService(android.content.Context.BLUETOOTH_SERVICE) as? android.bluetooth.BluetoothManager
+                val bluetoothAdapter = bluetoothManager?.adapter
+                
+                if (bluetoothAdapter == null) {
+                    sendEffect(HomeEffect.ShowPermissionDenied(
+                        deniedPermissions = listOf("Bluetooth Not Supported"),
+                        solution = "이 기기는 블루투스를 지원하지 않습니다"
+                    ))
+                    return@launch
+                }
+                
+                // 2. 권한 확인
+                if (!blePermissionChecker.hasAllBlePermissions()) {
+                    val missingPermissions = blePermissionChecker.getMissingBlePermissions()
+                    
+                    updateState { copy(bluetoothProgressMessage = "블루투스 권한이 필요합니다") }
+                    
+                    // 권한 설명 메시지 생성
+                    val explanations = missingPermissions.associateWith { permission ->
+                        when (permission) {
+                            android.Manifest.permission.BLUETOOTH_SCAN -> "근처 WISH RING 기기를 찾기 위해 필요합니다"
+                            android.Manifest.permission.BLUETOOTH_CONNECT -> "WISH RING 기기와 연결하기 위해 필요합니다"
+                            android.Manifest.permission.BLUETOOTH -> "블루투스 기능 사용을 위해 필요합니다"
+                            android.Manifest.permission.BLUETOOTH_ADMIN -> "블루투스 설정 관리를 위해 필요합니다"
+                            else -> "앱 기능 사용을 위해 필요한 권한입니다"
+                        }
+                    }
+                    
+                    updateState { 
+                        copy(
+                            showPermissionExplanation = true,
+                            permissionExplanations = explanations
+                        )
+                    }
+                    return@launch
+                }
+                
+                // 3. 블루투스 활성화 확인
+                if (!bluetoothAdapter.isEnabled) {
+                    updateState { copy(bluetoothProgressMessage = "블루투스 활성화가 필요합니다") }
+                    sendEffect(HomeEffect.EnableBluetooth)
+                    return@launch
+                }
+                
+                // 4. 모든 조건 만족 - BLE 스캔 시작
+                updateState { copy(bluetoothProgressMessage = "WISH RING 기기를 찾는 중...") }
+                startBleScanning()
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to check Bluetooth setup", e)
+                sendEffect(HomeEffect.ShowToast("블루투스 설정 확인 중 오류가 발생했습니다"))
+                updateState { 
+                    copy(
+                        showPermissionDenied = true,
+                        permissionDeniedMessage = "다시 시도해주세요. 문제가 계속되면 설정에서 수동으로 권한을 확인해주세요"
+                    )
+                }
+            }
+        }
+    }
+
     private fun dismissError() {
         updateState { copy(error = null) }
     }
 
-    // ===== MRD SDK 건강 데이터 기능들 =====
 
-    /**
-     * Load health data from device
-     */
-    private fun loadHealthData() {
-        if (!currentState.isBleConnected) {
-            sendEffect(HomeEffect.ShowToast("디바이스가 연결되지 않았습니다"))
-            return
-        }
-
+    private fun confirmShare(message: String, hashtags: String) {
         viewModelScope.launch {
-            updateState { copy(healthDataLoading = true) }
-
-            try {
-                // Load all health data in parallel
-                val heartRateDeferred = async { bleRepository.getLatestHeartRate() }
-                val stepDataDeferred = async { bleRepository.getStepData() }
-                val sleepDataDeferred = async { bleRepository.getSleepData() }
-                val temperatureDeferred = async { bleRepository.getTemperatureData() }
-                val bloodPressureDeferred = async { bleRepository.getLatestBloodPressure() }
-                val userProfileDeferred = async { bleRepository.getUserProfile() }
-
-                val heartRate = heartRateDeferred.await()
-                val stepData = stepDataDeferred.await()
-                val sleepData = sleepDataDeferred.await()
-                val temperature = temperatureDeferred.await()
-                val bloodPressure = bloodPressureDeferred.await()
-                val userProfile = userProfileDeferred.await()
-
-                updateState {
-                    copy(
-                        healthDataLoading = false,
-                        heartRateData = heartRate,
-                        stepData = stepData,
-                        sleepData = sleepData,
-                        temperatureData = temperature,
-                        bloodPressureData = bloodPressure,
-                        userProfile = userProfile
-                    )
-                }
-
-                sendEffect(HomeEffect.ShowToast("건강 데이터 로드 완료"))
-
-            } catch (e: Exception) {
-                updateState { copy(healthDataLoading = false) }
-                sendEffect(HomeEffect.ShowToast("건강 데이터 로드 실패: ${e.message}"))
-            }
+            updateState { copy(showShareDialog = false) }
+            // TODO: Implement actual sharing logic
+            sendEffect(HomeEffect.ShowToast("공유 기능 준비 중입니다"))
         }
     }
 
-    /**
-     * Start real-time heart rate monitoring
-     */
-    private fun startRealTimeHeartRate() {
-        if (!currentState.isBleConnected) {
-            sendEffect(HomeEffect.ShowToast("디바이스가 연결되지 않았습니다"))
-            return
-        }
-
-        updateState { copy(isRealTimeHeartRateActive = true) }
-
-        bleRepository.startRealTimeHeartRate()
-            .onEach { heartRateData ->
-                updateState { copy(heartRateData = heartRateData) }
-                sendEffect(HomeEffect.ShowToast("심박수: ${heartRateData.bpm} BPM"))
-            }
-            .catch { e ->
-                updateState { copy(isRealTimeHeartRateActive = false) }
-                sendEffect(HomeEffect.ShowToast("실시간 심박수 측정 오류: ${e.message}"))
-            }
-            .launchIn(viewModelScope)
+    private fun dismissShareDialog() {
+        updateState { copy(showShareDialog = false) }
     }
-
+    
+    private fun dismissPermissionExplanation() {
+        updateState { 
+            copy(
+                showPermissionExplanation = false,
+                permissionExplanations = emptyMap(),
+                bluetoothProgressMessage = ""
+            )
+        }
+    }
+    
+    private fun requestPermissionsFromExplanation() {
+        updateState { 
+            copy(
+                showPermissionExplanation = false,
+                permissionExplanations = emptyMap()
+            )
+        }
+        sendEffect(HomeEffect.RequestBluetoothPermissions)
+    }
+    
+    private fun dismissPermissionDenied() {
+        updateState { 
+            copy(
+                showPermissionDenied = false,
+                permissionDeniedMessage = "",
+                bluetoothProgressMessage = ""
+            )
+        }
+    }
+    
+    private fun openAppSettingsFromDialog() {
+        updateState { 
+            copy(
+                showPermissionDenied = false,
+                permissionDeniedMessage = ""
+            )
+        }
+        sendEffect(HomeEffect.OpenAppSettings)
+    }
+    
+    
     /**
-     * Stop real-time heart rate monitoring
+     * 디버그 이벤트 히스토리 관찰
      */
-    private fun stopRealTimeHeartRate() {
+    private fun observeDebugEventHistory() {
         viewModelScope.launch {
-            val success = bleRepository.stopRealTimeHeartRate()
-            updateState { copy(isRealTimeHeartRateActive = false) }
-
-            if (success) {
-                sendEffect(HomeEffect.ShowToast("실시간 심박수 측정 중지"))
-            } else {
-                sendEffect(HomeEffect.ShowToast("측정 중지 실패"))
-            }
+            // BleRepository에서 이벤트 히스토리를 구독하는 로직은
+            // 실제 테스트에서 로그로 확인하는 것이 더 안전함
+            Log.d(TAG, "Debug event history observation initialized")
         }
     }
-
+    
     /**
-     * Start real-time ECG monitoring
+     * 디버그 패널 토글
      */
-    private fun startRealTimeEcg() {
-        if (!currentState.isBleConnected) {
-            sendEffect(HomeEffect.ShowToast("디바이스가 연결되지 않았습니다"))
-            return
-        }
-
-        bleRepository.startRealTimeEcg()
-            .onEach { ecgData ->
-                sendEffect(
-                    HomeEffect.ShowEcgData(
-                        EcgDisplayData(
-                            data = ecgData.data,
-                            heartRate = ecgData.heartRate,
-                            timestamp = ecgData.timestamp,
-                            quality = ecgData.quality.name
-                        )
-                    )
-                )
-            }
-            .catch { e ->
-                sendEffect(HomeEffect.ShowToast("실시간 ECG 측정 오류: ${e.message}"))
-            }
-            .launchIn(viewModelScope)
+    private fun toggleDebugPanel() {
+        updateState { copy(showDebugPanel = !showDebugPanel) }
     }
-
+    
     /**
-     * Stop real-time ECG monitoring
+     * 디버그 히스토리 클리어
      */
-    private fun stopRealTimeEcg() {
-        viewModelScope.launch {
-            val success = bleRepository.stopRealTimeEcg()
-
-            if (success) {
-                sendEffect(HomeEffect.ShowToast("실시간 ECG 측정 중지"))
-            } else {
-                sendEffect(HomeEffect.ShowToast("ECG 측정 중지 실패"))
-            }
-        }
+    private fun clearDebugHistory() {
+        updateState { copy(debugEventHistory = emptyList()) }
+        sendEffect(HomeEffect.ShowToast("디버그 히스토리가 클리어되었습니다"))
+        Log.d(TAG, "Debug history cleared")
     }
-
-    /**
-     * Update user profile
-     */
-    private fun updateUserProfile(userProfile: UserProfile) {
-        if (!currentState.isBleConnected) {
-            sendEffect(HomeEffect.ShowToast("디바이스가 연결되지 않았습니다"))
-            return
-        }
-
-        viewModelScope.launch {
-            try {
-                val success = bleRepository.setUserProfile(userProfile)
-
-                if (success) {
-                    updateState { copy(userProfile = userProfile) }
-                    sendEffect(HomeEffect.ShowToast("사용자 정보 업데이트 완료"))
-
-                    // Save to preferences for future use
-                    // TODO: Save user profile to preferences
-                    // preferencesRepository.setUserProfile(userProfile)
-                } else {
-                    sendEffect(HomeEffect.ShowToast("사용자 정보 업데이트 실패"))
-                }
-
-            } catch (e: Exception) {
-                sendEffect(HomeEffect.ShowToast("사용자 정보 업데이트 오류: ${e.message}"))
-            }
-        }
-    }
-
-    /**
-     * Set sport target (daily step goal)
-     */
-    private fun setSportTarget(steps: Int) {
-        if (!currentState.isBleConnected) {
-            sendEffect(HomeEffect.ShowToast("디바이스가 연결되지 않았습니다"))
-            return
-        }
-
-        viewModelScope.launch {
-            try {
-                val success = bleRepository.setSportTarget(steps)
-
-                if (success) {
-                    sendEffect(HomeEffect.ShowToast("목표 걸음 수 설정 완료: ${steps}걸음"))
-
-                    // Save to preferences
-                    // TODO: Save daily step target to preferences
-                    // preferencesRepository.setDailyStepTarget(steps)
-                } else {
-                    sendEffect(HomeEffect.ShowToast("목표 설정 실패"))
-                }
-
-            } catch (e: Exception) {
-                sendEffect(HomeEffect.ShowToast("목표 설정 오류: ${e.message}"))
-            }
-        }
-    }
-
-    /**
-     * Send app notification to device
-     */
-    private fun sendAppNotification(notification: AppNotification) {
-        if (!currentState.isBleConnected) {
-            sendEffect(HomeEffect.ShowToast("디바이스가 연결되지 않았습니다"))
-            return
-        }
-
-        viewModelScope.launch {
-            try {
-                val success = bleRepository.sendAppNotification(notification)
-
-                if (success) {
-                    sendEffect(HomeEffect.ShowToast("알림 전송 완료"))
-                } else {
-                    sendEffect(HomeEffect.ShowToast("알림 전송 실패"))
-                }
-
-            } catch (e: Exception) {
-                sendEffect(HomeEffect.ShowToast("알림 전송 오류: ${e.message}"))
-            }
-        }
-    }
-
-    /**
-     * Update device settings
-     */
-    private fun updateDeviceSettings(units: UnitPreferences) {
-        if (!currentState.isBleConnected) {
-            sendEffect(HomeEffect.ShowToast("디바이스가 연결되지 않았습니다"))
-            return
-        }
-
-        viewModelScope.launch {
-            try {
-                val success = bleRepository.setUnitPreferences(units)
-
-                if (success) {
-                    sendEffect(HomeEffect.ShowToast("디바이스 설정 업데이트 완료"))
-                    // TODO: preferencesRepository.setUnitPreferences(units)
-                } else {
-                    sendEffect(HomeEffect.ShowToast("설정 업데이트 실패"))
-                }
-
-            } catch (e: Exception) {
-                sendEffect(HomeEffect.ShowToast("설정 업데이트 오류: ${e.message}"))
-            }
-        }
-    }
-
-    /**
-     * Find device (make it vibrate/beep)
-     */
-    private fun findDevice() {
-        if (!currentState.isBleConnected) {
-            sendEffect(HomeEffect.ShowToast("디바이스가 연결되지 않았습니다"))
-            return
-        }
-
-        viewModelScope.launch {
-            try {
-                val success = bleRepository.findDevice(true)
-
-                if (success) {
-                    sendEffect(HomeEffect.ShowToast("디바이스를 찾는 중..."))
-
-                    // Stop after 5 seconds
-                    delay(5000)
-                    bleRepository.findDevice(false)
-                } else {
-                    sendEffect(HomeEffect.ShowToast("디바이스 찾기 실패"))
-                }
-
-            } catch (e: Exception) {
-                sendEffect(HomeEffect.ShowToast("디바이스 찾기 오류: ${e.message}"))
-            }
-        }
-    }
-
-    /**
-     * Show health data details
-     */
-    private fun showHealthDetails(type: HealthDataType) {
-        when (type) {
-            HealthDataType.HEART_RATE -> {
-                val heartRate = currentState.heartRateData
-                if (heartRate != null) {
-                    sendEffect(
-                        HomeEffect.ShowHealthDetailDialog(
-                            HealthDetailInfo(
-                                type = type,
-                                title = "심박수 데이터",
-                                currentValue = "${heartRate.bpm} BPM",
-                                timestamp = heartRate.timestamp,
-                                quality = heartRate.quality.name
-                            )
-                        )
-                    )
-                } else {
-                    sendEffect(HomeEffect.ShowToast("심박수 데이터가 없습니다"))
-                }
-            }
-
-            HealthDataType.STEPS -> {
-                val steps = currentState.stepData
-                if (steps != null) {
-                    sendEffect(
-                        HomeEffect.ShowHealthDetailDialog(
-                            HealthDetailInfo(
-                                type = type,
-                                title = "걸음 데이터",
-                                currentValue = "${steps.steps} 걸음",
-                                additionalInfo = "거리: ${steps.distance}km, 칼로리: ${steps.calories}kcal",
-                                timestamp = System.currentTimeMillis(),
-                                quality = "GOOD"
-                            )
-                        )
-                    )
-                } else {
-                    sendEffect(HomeEffect.ShowToast("걸음 데이터가 없습니다"))
-                }
-            }
-
-            HealthDataType.SLEEP -> {
-                val sleep = currentState.sleepData
-                if (sleep != null) {
-                    sendEffect(
-                        HomeEffect.ShowHealthDetailDialog(
-                            HealthDetailInfo(
-                                type = type,
-                                title = "수면 데이터",
-                                currentValue = "${sleep.totalSleepMinutes / 60}시간 ${sleep.totalSleepMinutes % 60}분",
-                                additionalInfo = "깊은 잠: ${sleep.deepSleepMinutes}분, 얕은 잠: ${sleep.lightSleepMinutes}분",
-                                timestamp = System.currentTimeMillis(),
-                                quality = sleep.sleepQuality.name
-                            )
-                        )
-                    )
-                } else {
-                    sendEffect(HomeEffect.ShowToast("수면 데이터가 없습니다"))
-                }
-            }
-
-            else -> {
-                sendEffect(HomeEffect.ShowToast("해당 데이터는 아직 지원되지 않습니다"))
-            }
-        }
-    }
-
-    /**
-     * Observe health data updates from device
-     */
-    private fun observeHealthDataUpdates() {
-        bleRepository.subscribeToHealthDataUpdates()
-            .onEach { healthUpdate ->
-                when (healthUpdate.type) {
-                    HealthDataType.HEART_RATE -> {
-                        val heartRateData = healthUpdate.data as? HeartRateData
-                        heartRateData?.let { updateState { copy(heartRateData = it) } }
-                    }
-
-                    HealthDataType.STEPS -> {
-                        val stepData = healthUpdate.data as? StepData
-                        stepData?.let { updateState { copy(stepData = it) } }
-                    }
-
-                    HealthDataType.SLEEP -> {
-                        val sleepData = healthUpdate.data as? SleepData
-                        sleepData?.let { updateState { copy(sleepData = it) } }
-                    }
-
-                    HealthDataType.TEMPERATURE -> {
-                        val temperatureData = healthUpdate.data as? TemperatureData
-                        temperatureData?.let { updateState { copy(temperatureData = it) } }
-                    }
-
-                    HealthDataType.BLOOD_PRESSURE -> {
-                        val bloodPressureData = healthUpdate.data as? BloodPressureData
-                        bloodPressureData?.let { updateState { copy(bloodPressureData = it) } }
-                    }
-
-                    else -> { /* Handle other types */
-                    }
-                }
-
-                sendEffect(HomeEffect.ShowToast("건강 데이터 업데이트됨"))
-            }
-            .launchIn(viewModelScope)
-    }
-
-    /**
-     * Observe device status updates
-     */
-    private fun observeDeviceStatus() {
-        bleRepository.subscribeToDeviceStatus()
-            .onEach { deviceStatus ->
-                updateState { copy(deviceSettings = deviceStatus) }
-
-                // Update battery level
-                updateState { copy(deviceBatteryLevel = deviceStatus.batteryLevel) }
-
-                // Show low battery warning if needed
-                if (deviceStatus.batteryLevel < 15 && !currentState.showLowBatteryWarning) {
-                    sendEffect(
-                        HomeEffect.ShowToast("배터리가 부족합니다 (${deviceStatus.batteryLevel}%)")
-                    )
-                }
-            }
-            .launchIn(viewModelScope)
+    companion object {
+        private const val TAG = "HomeViewModel"
     }
 }

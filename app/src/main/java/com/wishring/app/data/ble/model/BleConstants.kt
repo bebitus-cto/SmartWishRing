@@ -10,15 +10,12 @@ import java.util.*
 object BleConstants {
     
     // Service & Characteristic UUIDs
-    val SERVICE_UUID: UUID = UUID.fromString("0000fff0-0000-1000-8000-00805f9b34fb")
-    val COUNTER_CHAR_UUID: UUID = UUID.fromString("0000fff1-0000-1000-8000-00805f9b34fb")
+    val SERVICE_UUID: UUID = UUID.fromString("f000efe0-0451-4000-0000-00000000b000")
+    val COUNTER_CHAR_UUID: UUID = UUID.fromString("f000efe3-0451-4000-0000-00000000b000")
     val BATTERY_CHAR_UUID: UUID = UUID.fromString("0000fff2-0000-1000-8000-00805f9b34fb")
     val RESET_CHAR_UUID: UUID = UUID.fromString("0000fff3-0000-1000-8000-00805f9b34fb")
     
-    // Device identification
-    const val DEVICE_NAME = "WishRing"
-    const val DEVICE_NAME_PREFIX = "WISH"
-    
+    // Device identification (removed fake WishRing constants)
     // Scan settings
     const val SCAN_TIMEOUT_MS = 10000L      // 10초
     const val CONNECTION_TIMEOUT_MS = 5000L  // 5초

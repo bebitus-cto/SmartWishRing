@@ -1,5 +1,6 @@
 package com.wishring.app.presentation.wishinput.model
 
+import com.wishring.app.data.local.database.entity.WishData
 import java.time.LocalDate
 import java.util.UUID
 
@@ -31,6 +32,16 @@ data class WishItem(
     val targetCountDisplay: String
         get() = "${targetCount}회"
     
+    /**
+     * Convert to WishData for database storage
+     */
+    fun toWishData(): WishData {
+        return WishData(
+            text = text,
+            targetCount = targetCount
+        )
+    }
+    
     companion object {
         /**
          * Create empty wish item for input
@@ -48,5 +59,29 @@ data class WishItem(
                 targetCount = targetCount
             )
         }
+        
+        /**
+         * Create from WishData
+         */
+        fun fromWishData(wishData: WishData): WishItem {
+            return WishItem(
+                text = wishData.text,
+                targetCount = wishData.targetCount
+            )
+        }
     }
+}
+
+/**
+ * Extension function to convert List<WishItem> to List<WishData>
+ */
+fun List<WishItem>.toWishDataList(): List<WishData> {
+    return this.map { it.toWishData() }
+}
+
+/**
+ * Extension function to convert List<WishData> to List<WishItem>
+ */
+fun List<WishData>.toWishItemList(): List<WishItem> {
+    return this.map { WishItem.fromWishData(it) }
 }

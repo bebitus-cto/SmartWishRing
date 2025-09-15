@@ -25,7 +25,7 @@ import androidx.compose.ui.unit.dp
 import com.wishring.app.R
 import com.wishring.app.domain.repository.BleConnectionState
 import com.wishring.app.domain.repository.isConnected
-import com.wishring.app.presentation.viewmodel.BatteryStatus
+import com.wishring.app.domain.model.BatteryStatus
 
 /**
  * Extension function to get status text for BleConnectionState enum
@@ -186,6 +186,7 @@ private fun BatteryIndicator(
 ) {
     val batteryColor = when (status) {
         BatteryStatus.GOOD -> Color(0xFF4CAF50)
+        BatteryStatus.HIGH -> Color(0xFF4CAF50)  // Same as GOOD (deprecated)
         BatteryStatus.MEDIUM -> Color(0xFFFF9800)
         BatteryStatus.LOW -> Color(0xFFE91E63)
     }
@@ -197,6 +198,7 @@ private fun BatteryIndicator(
         Icon(
             imageVector = when (status) {
                 BatteryStatus.GOOD -> Icons.Default.BatteryFull
+                BatteryStatus.HIGH -> Icons.Default.BatteryFull  // Same as GOOD (deprecated)
                 BatteryStatus.MEDIUM -> Icons.Default.Battery3Bar
                 BatteryStatus.LOW -> Icons.Default.Battery1Bar
             },
@@ -213,40 +215,5 @@ private fun BatteryIndicator(
             color = batteryColor,
             fontWeight = FontWeight.Medium
         )
-    }
-}
-
-@Preview
-@Composable
-private fun BleStatusCardPreview() {
-    MaterialTheme {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            BleStatusCard(
-                connectionState = BleConnectionState.CONNECTED,
-                batteryLevel = 85,
-                batteryStatus = BatteryStatus.GOOD,
-                onRetryConnection = {},
-                onOpenSettings = {}
-            )
-            
-            BleStatusCard(
-                connectionState = BleConnectionState.CONNECTING,
-                batteryLevel = 0,
-                batteryStatus = BatteryStatus.GOOD,
-                onRetryConnection = {},
-                onOpenSettings = {}
-            )
-            
-            BleStatusCard(
-                connectionState = BleConnectionState.DISCONNECTED,
-                batteryLevel = 0,
-                batteryStatus = BatteryStatus.GOOD,
-                onRetryConnection = {},
-                onOpenSettings = {}
-            )
-        }
     }
 }

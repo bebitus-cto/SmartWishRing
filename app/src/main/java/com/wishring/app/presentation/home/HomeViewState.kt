@@ -1,8 +1,10 @@
 package com.wishring.app.presentation.home
 
-import com.wishring.app.domain.model.*
+import com.wishring.app.domain.model.WishCount
+import com.wishring.app.domain.model.DailyRecord
 import com.wishring.app.domain.repository.BleConnectionState
 import com.wishring.app.domain.repository.StreakInfo
+import com.wishring.app.core.util.Constants
 
 /**
  * ViewState for Home screen
@@ -11,6 +13,8 @@ import com.wishring.app.domain.repository.StreakInfo
 data class HomeViewState(
     val isLoading: Boolean = false,
     val todayWishCount: WishCount? = null,
+    val totalCount: Int = 0,
+    val targetCount: Int = Constants.DEFAULT_TARGET_COUNT,
     val recentRecords: List<DailyRecord> = emptyList(),
     val streakInfo: StreakInfo? = null,
     val bleConnectionState: BleConnectionState = BleConnectionState.DISCONNECTED,
@@ -20,58 +24,67 @@ data class HomeViewState(
     val showCompletionAnimation: Boolean = false,
     val lastSyncTime: Long? = null,
     
-    // ===== MRD SDK 건강 데이터 =====
-    val heartRateData: HeartRateData? = null,
-    val stepData: StepData? = null,
-    val sleepData: SleepData? = null,
-    val temperatureData: TemperatureData? = null,
-    val bloodPressureData: BloodPressureData? = null,
-    val isRealTimeHeartRateActive: Boolean = false,
-    val healthDataLoading: Boolean = false,
-    val userProfile: UserProfile? = null,
-    val deviceSettings: DeviceStatus? = null
+
+    
+    // ===== 공유 기능 =====
+    val showShareDialog: Boolean = false,
+    val isSharing: Boolean = false,
+    
+    // ===== 권한 관련 =====
+    val showPermissionExplanation: Boolean = false,
+    val permissionExplanations: Map<String, String> = emptyMap(),
+    val showPermissionDenied: Boolean = false,
+    val permissionDeniedMessage: String = "",
+    val bluetoothProgressMessage: String = "",
+    
+    // ===== BLE 기기 선택 =====
+    val showBleDevicePicker: Boolean = false,
+    val availableBleDevices: List<DeviceInfo> = emptyList(),
+    
+    // ===== 연결 성공 애니메이션 =====
+    val showConnectionSuccessAnimation: Boolean = false,
+    
+    // ===== 디버깅 모드 =====
+    val showDebugPanel: Boolean = false,
+    val debugEventHistory: List<String> = emptyList()
 ) {
     /**
      * Current count display
      */
     val currentCount: Int
-        get() = todayWishCount?.totalCount ?: 0
+        get() = totalCount
     
     /**
-     * Target count display
-     */
-    val targetCount: Int
-        get() = todayWishCount?.targetCount ?: 0
-    
-    /**
-     * Wish text display
-     */
-    val wishText: String
-        get() = todayWishCount?.wishText ?: ""
-    
-    /**
-     * Progress percentage (0-100)
+     * Progress percentage (0-100) 
      */
     val progressPercentage: Int
-        get() = todayWishCount?.progressPercentage ?: 0
+        get() = if (targetCount > 0) {
+            ((totalCount.toFloat() / targetCount) * 100).coerceIn(0f, 100f).toInt()
+        } else {
+            0
+        }
     
     /**
-     * Progress float value (0.0-1.0)
+     * Progress float value (0.0-1.0) 
      */
     val progress: Float
-        get() = todayWishCount?.progress ?: 0f
+        get() = if (targetCount > 0) {
+            (totalCount.toFloat() / targetCount).coerceIn(0f, 1f)
+        } else {
+            0f
+        }
     
     /**
-     * Is goal completed
+     * Is goal completed 
      */
     val isCompleted: Boolean
-        get() = todayWishCount?.isCompleted ?: false
+        get() = totalCount >= targetCount
     
     /**
      * Remaining count to target
      */
     val remainingCount: Int
-        get() = todayWishCount?.remainingCount ?: targetCount
+        get() = (targetCount - totalCount).coerceAtLeast(0)
     
     /**
      * Is BLE connected
@@ -116,10 +129,10 @@ data class HomeViewState(
         get() = !isLoading && todayWishCount == null
     
     /**
-     * Can increment count
+     * Can increment count (disabled - only BLE can increment)
      */
     val canIncrement: Boolean
-        get() = !isLoading && !isCompleted && currentCount < 99999
+        get() = false // Manual increment disabled
     
     /**
      * Show sync status
@@ -165,10 +178,10 @@ data class HomeViewState(
     
     /**
      * Should show battery level
-     * Only show when device is connected and battery level is available
+     * Always show battery indicator
      */
     val shouldShowBatteryLevel: Boolean
-        get() = isBleConnected && deviceBatteryLevel != null
+        get() = true
     
     /**
      * Get battery level icon
@@ -183,4 +196,6 @@ data class HomeViewState(
             deviceBatteryLevel >= 10 -> "battery_1_bar"
             else -> "battery_alert"
         }
+    
+
 }

@@ -1,5 +1,6 @@
 package com.wishring.app.domain.repository
 
+import com.wishring.app.data.local.database.entity.WishData
 import com.wishring.app.domain.model.DailyRecord
 import com.wishring.app.domain.model.WishCount
 import kotlinx.coroutines.flow.Flow
@@ -90,6 +91,36 @@ interface WishCountRepository {
         wishText: String? = null,
         targetCount: Int? = null
     ): WishCount
+    
+    /**
+     * Update today's wishes with multiple wish data
+     * @param wishesData List of wish data to save
+     * @param activeWishIndex Index of currently active wish
+     * @return Updated WishCount
+     */
+    suspend fun updateTodayWishesAndTarget(
+        wishesData: List<WishData>,
+        activeWishIndex: Int = 0
+    ): WishCount
+    
+    /**
+     * Set active wish index
+     * @param index Index of wish to make active (0, 1, or 2)
+     * @return Updated WishCount
+     */
+    suspend fun setActiveWishIndex(index: Int): WishCount
+    
+    /**
+     * Get current active wish index
+     * @return Active wish index
+     */
+    suspend fun getActiveWishIndex(): Int
+    
+    /**
+     * Get today's wishes as list
+     * @return List of WishData for today
+     */
+    suspend fun getTodayWishes(): List<WishData>
     
     /**
      * Reset today's count

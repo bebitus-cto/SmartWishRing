@@ -7,18 +7,22 @@
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+    
+    <!-- Location permissions required for BLE scanning on Android 6.0+ -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
     
     <!-- Foreground service permissions -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     
     <!-- Wake lock for background BLE management -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     
     <!-- Post notifications for service status -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    
+
 
     <!-- BLE feature requirement -->
     <uses-feature
@@ -51,8 +55,18 @@
         <service
             android:name=".ble.BleAutoConnectService"
             android:enabled="true"
+            android:exported="false" />
+            
+        <!-- FileProvider for sharing images -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
             android:exported="false"
-            android:foregroundServiceType="connectedDevice" />
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>

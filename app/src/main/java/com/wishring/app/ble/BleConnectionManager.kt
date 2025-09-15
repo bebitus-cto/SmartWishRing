@@ -80,7 +80,6 @@ class BleConnectionManager @Inject constructor(
         val device: BluetoothDevice,
         val rssi: Int,
         val serviceUuids: List<String>?,
-        val isWishRing: Boolean,
         val discoveryTime: Long = System.currentTimeMillis()
     )
     
@@ -96,11 +95,13 @@ class BleConnectionManager @Inject constructor(
         }
         
         if (isScanning) {
-            Log.d(TAG, "Scanning is already in progress")
+            Log.w(TAG, "⚠️ 스캔이 이미 진행중입니다! 기존 스캔을 중지하고 새로 시작합니다.")
             return
         }
         
-        Log.d(TAG, "Starting smart scan")
+        Log.d(TAG, "🔍 === BLE Smart Scan 시작 ===")
+        Log.d(TAG, "📡 Service UUID: ${BleConstants.SERVICE_UUID}")
+        Log.d(TAG, "🔄 현재 스캔 상태: isScanning=$isScanning")
         
         val scanFilters = createScanFilters()
         val scanSettings = createScanSettings()
@@ -346,11 +347,17 @@ class BleConnectionManager @Inject constructor(
      * 스캔 필터 생성
      */
     private fun createScanFilters(): List<ScanFilter> {
+        // UUID 필터 임시 제거 - 모든 BLE 기기 스캔
+        return emptyList()
+        
+        // 원래 코드 (WISH RING만 필터링)
+        /*
         return listOf(
             ScanFilter.Builder()
                 .setServiceUuid(ParcelUuid(BleConstants.SERVICE_UUID_OBJ))
                 .build()
         )
+        */
     }
     
     /**
@@ -390,14 +397,15 @@ class BleConnectionManager @Inject constructor(
         val rssi = result.rssi
         val serviceUuids = result.scanRecord?.serviceUuids?.map { it.toString() }
         
-        // 빠른 검증
-        val isWishRing = deviceValidator.quickValidation(device.name)
+        // 디버그 로깅 추가
+        Log.d(TAG, "🎯 기기 발견: ${device.name ?: "Unknown"} (${device.address})")
+        Log.d(TAG, "   📡 RSSI: $rssi")
+        Log.d(TAG, "   📋 Service UUIDs: $serviceUuids")
         
         val discoveredDevice = DiscoveredDevice(
             device = device,
             rssi = rssi,
-            serviceUuids = serviceUuids,
-            isWishRing = isWishRing
+            serviceUuids = serviceUuids
         )
         
         // 발견된 기기 목록 업데이트
@@ -411,12 +419,6 @@ class BleConnectionManager @Inject constructor(
         }
         
         _discoveredDevices.value = currentDevices
-        
-        // WISH RING 기기이고 연결되지 않은 상태라면 자동 연결 시도
-        if (isWishRing && _connectionState.value == BleConnectionState.DISCONNECTED) {
-            Log.d(TAG, "Found WISH RING device, attempting auto connect: ${device.address}")
-            connectToDevice(device)
-        }
     }
     
     /**

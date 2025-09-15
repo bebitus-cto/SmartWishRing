@@ -6,9 +6,12 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
+import android.os.Build
 import android.os.IBinder
 import android.util.Log
+import androidx.core.content.ContextCompat
 import androidx.core.app.NotificationCompat
 import com.wishring.app.R
 import com.wishring.app.di.IoDispatcher
@@ -153,17 +156,135 @@ class BleAutoConnectService : Service() {
     }
     
     /**
+     * Foreground Service 시작에 필요한 권한이 있는지 확인
+     */
+    private fun hasRequiredPermissions(): Boolean {
+        // Basic FOREGROUND_SERVICE 권한 확인 (모든 API 레벨)
+        val foregroundServicePermission = ContextCompat.checkSelfPermission(
+            this,
+            android.Manifest.permission.FOREGROUND_SERVICE
+        ) == PackageManager.PERMISSION_GRANTED
+        
+        // BLE 관련 권한 확인
+        val bluetoothPermissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            // Android 12+: 새로운 BLE 권한
+            val bluetoothConnect = ContextCompat.checkSelfPermission(
+                this,
+                android.Manifest.permission.BLUETOOTH_CONNECT
+            ) == PackageManager.PERMISSION_GRANTED
+            
+            val bluetoothScan = ContextCompat.checkSelfPermission(
+                this,
+                android.Manifest.permission.BLUETOOTH_SCAN
+            ) == PackageManager.PERMISSION_GRANTED
+            
+            bluetoothConnect && bluetoothScan
+        } else {
+            // Android 11 이하: 기존 BLE 권한
+            val bluetooth = ContextCompat.checkSelfPermission(
+                this,
+                android.Manifest.permission.BLUETOOTH
+            ) == PackageManager.PERMISSION_GRANTED
+            
+            val bluetoothAdmin = ContextCompat.checkSelfPermission(
+                this,
+                android.Manifest.permission.BLUETOOTH_ADMIN
+            ) == PackageManager.PERMISSION_GRANTED
+            
+            bluetooth && bluetoothAdmin
+        }
+        
+        // 알림 권한 확인 (Android 13+)
+        val notificationPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(
+                this,
+                android.Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true // Android 12 이하에서는 자동으로 허용
+        }
+        
+        val hasAllPermissions = foregroundServicePermission && bluetoothPermissions && notificationPermission
+        
+        Log.d(TAG, "Permission check - API Level: ${Build.VERSION.SDK_INT}")
+        Log.d(TAG, "Foreground Service: $foregroundServicePermission")
+        Log.d(TAG, "Bluetooth: $bluetoothPermissions") 
+        Log.d(TAG, "Notification: $notificationPermission")
+        Log.d(TAG, "All permissions: $hasAllPermissions")
+        
+        return hasAllPermissions
+    }
+    
+    /**
      * Foreground Service 시작
      */
     private fun startForegroundService() {
-        val notification = createNotification(
-            title = "WISH RING 연결 중...",
-            content = "스마트 링을 찾고 있습니다",
-            state = ServiceState.SCANNING
-        )
-        
-        startForeground(BleConstants.SERVICE_NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
-        _serviceState.value = ServiceState.SCANNING
+        try {
+            Log.d(TAG, "Starting foreground service...")
+            
+            // 알림 채널이 생성되었는지 확인
+            createNotificationChannel()
+            
+            val hasPermissions = hasRequiredPermissions()
+            Log.d(TAG, "Has required permissions: $hasPermissions")
+            
+            val notification = createNotification(
+                title = "WISH RING 연결 중...",
+                content = if (hasPermissions) {
+                    "스마트 링을 찾고 있습니다"
+                } else {
+                    "BLE 권한이 필요합니다"
+                },
+                state = ServiceState.SCANNING
+            )
+            
+            // For maximum compatibility, avoid using foregroundServiceType entirely
+            // This prevents SecurityException on different Android versions
+            startForeground(
+                BleConstants.SERVICE_NOTIFICATION_ID, 
+                notification
+            )
+            
+            Log.d(TAG, "Foreground service started successfully")
+            
+            // Check permissions AFTER startForeground
+            if (!hasPermissions) {
+                Log.w(TAG, "Missing required permissions - service running in limited mode")
+                updateNotification(
+                    title = "WISH RING 권한 필요",
+                    content = "앱에서 BLE 권한을 허용해주세요",
+                    state = ServiceState.ERROR
+                )
+                _serviceState.value = ServiceState.ERROR
+            } else {
+                _serviceState.value = ServiceState.SCANNING
+            }
+            
+        } catch (e: SecurityException) {
+            Log.e(TAG, "SecurityException starting foreground service - missing permissions", e)
+            _serviceState.value = ServiceState.ERROR
+            
+            // 기본 알림으로라도 서비스 시작
+            try {
+                val basicNotification = createBasicNotification()
+                startForeground(BleConstants.SERVICE_NOTIFICATION_ID, basicNotification)
+            } catch (ex: Exception) {
+                Log.e(TAG, "Failed to start foreground service with basic notification", ex)
+                stopSelf()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Exception starting foreground service", e)
+            _serviceState.value = ServiceState.ERROR
+            
+            // 기본 알림으로라도 서비스 시작
+            try {
+                val basicNotification = createBasicNotification()
+                startForeground(BleConstants.SERVICE_NOTIFICATION_ID, basicNotification)
+            } catch (ex: Exception) {
+                Log.e(TAG, "Failed to start foreground service with basic notification", ex)
+                stopSelf()
+            }
+        }
     }
     
     /**
@@ -324,17 +445,37 @@ class BleAutoConnectService : Service() {
      * 알림 채널 생성
      */
     private fun createNotificationChannel() {
-        val channel = NotificationChannel(
-            BleConstants.NOTIFICATION_CHANNEL_ID,
-            BleConstants.NOTIFICATION_CHANNEL_NAME,
-            NotificationManager.IMPORTANCE_LOW
-        ).apply {
-            description = "WISH RING BLE 연결 상태를 표시합니다"
-            setShowBadge(false)
-            setSound(null, null)
+        try {
+            if (notificationManager == null) {
+                notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            }
+            
+            // 이미 채널이 있는지 확인
+            val existingChannel = notificationManager?.getNotificationChannel(BleConstants.NOTIFICATION_CHANNEL_ID)
+            if (existingChannel != null) {
+                Log.d(TAG, "Notification channel already exists")
+                return
+            }
+            
+            val channel = NotificationChannel(
+                BleConstants.NOTIFICATION_CHANNEL_ID,
+                BleConstants.NOTIFICATION_CHANNEL_NAME,
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "WISH RING BLE 연결 상태를 표시합니다"
+                setShowBadge(false)
+                setSound(null, null)
+                enableLights(false)
+                enableVibration(false)
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            }
+            
+            notificationManager?.createNotificationChannel(channel)
+            Log.d(TAG, "Notification channel created successfully")
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to create notification channel", e)
         }
-        
-        notificationManager?.createNotificationChannel(channel)
     }
     
     /**
@@ -366,6 +507,21 @@ class BleAutoConnectService : Service() {
     }
     
     /**
+     * 기본 알림 생성 (권한 없을 때 사용)
+     */
+    private fun createBasicNotification(): Notification {
+        return NotificationCompat.Builder(this, BleConstants.NOTIFICATION_CHANNEL_ID)
+            .setContentTitle("WISH RING 서비스")
+            .setContentText("백그라운드에서 실행 중입니다")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .setOngoing(true)
+            .setAutoCancel(false)
+            .setShowWhen(false)
+            .build()
+    }
+    
+    /**
      * 알림 업데이트
      */
     private fun updateNotification(
@@ -373,7 +529,11 @@ class BleAutoConnectService : Service() {
         content: String,
         state: ServiceState
     ) {
-        val notification = createNotification(title, content, state)
-        notificationManager?.notify(BleConstants.SERVICE_NOTIFICATION_ID, notification)
+        try {
+            val notification = createNotification(title, content, state)
+            notificationManager?.notify(BleConstants.SERVICE_NOTIFICATION_ID, notification)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to update notification", e)
+        }
     }
 }

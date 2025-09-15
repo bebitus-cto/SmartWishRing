@@ -5,13 +5,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-
 import androidx.compose.foundation.shape.RoundedCornerShape
-
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,14 +25,12 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.wishring.app.R
-import com.wishring.app.domain.model.DailyRecord
 import com.wishring.app.ui.theme.*
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 
 /**
- * Detail screen composable
- * Shows detailed wish count information and motivational messages
+ * Simplified WishDetail screen matching Figma design
+ * Shows count, wish text, and motivational messages for a specific date
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,33 +39,16 @@ fun WishDetailScreen(
     onNavigateBack: () -> Unit = {},
     viewModel: WishDetailViewModel = hiltViewModel()
 ) {
-    val viewState by viewModel.uiState.collectAsStateWithLifecycle()
-    val context = LocalContext.current
-    
-    // Initialize with date if provided
-    LaunchedEffect(initialDate) {
-        initialDate?.let {
-            try {
-                val date = LocalDate.parse(it)
-                viewModel.onEvent(DetailEvent.SelectDate(date))
-            } catch (e: Exception) {
-                // Handle invalid date format
-            }
-        }
-    }
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     
     // Handle effects
     LaunchedEffect(Unit) {
         viewModel.effect.collect { effect ->
             when (effect) {
-                is DetailEffect.NavigateBack -> onNavigateBack()
-                is DetailEffect.ShowToast -> {
-                    // Show toast
+                is WishDetailEffect.NavigateBack -> onNavigateBack()
+                is WishDetailEffect.ShowToast -> {
+                    // Handle toast if needed
                 }
-                is DetailEffect.ShowShareSheet -> {
-                    // Handle share
-                }
-                else -> {}
             }
         }
     }
@@ -79,13 +57,12 @@ fun WishDetailScreen(
         containerColor = Background_Secondary,
         topBar = {
             WishDetailTopBar(
-                onBackClick = { viewModel.onEvent(DetailEvent.NavigateBack) },
-                onShareClick = { viewModel.onEvent(DetailEvent.ShareRecord()) }
+                onBackClick = { viewModel.onEvent(WishDetailEvent.NavigateBack) }
             )
         }
     ) { paddingValues ->
         WishDetailContent(
-            viewState = viewState,
+            uiState = uiState,
             onEvent = viewModel::onEvent,
             modifier = Modifier.padding(paddingValues)
         )
@@ -94,8 +71,8 @@ fun WishDetailScreen(
 
 @Composable
 private fun WishDetailContent(
-    viewState: DetailViewState,
-    onEvent: (DetailEvent) -> Unit,
+    uiState: WishDetailViewState,
+    onEvent: (WishDetailEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -104,43 +81,11 @@ private fun WishDetailContent(
             .background(Background_Secondary)
     ) {
         // Date selector header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(50.dp)
-                .background(Color.White)
-                .border(width = 0.dp, color = Color(0xFFC0C0C0), shape = RoundedCornerShape(0.dp)),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            IconButton(
-                onClick = { /* Navigate to previous date */ },
-                modifier = Modifier.padding(start = 17.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ArrowBack,
-                    contentDescription = "Previous",
-                    tint = Text_Primary
-                )
-            }
-            
-            Spacer(modifier = Modifier.weight(1f))
-            
-            Text(
-                text = viewState.selectedDate.format(DateTimeFormatter.ofPattern("yyyy.MM.dd")),
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium
-                ),
-                color = Text_Primary,
-                textAlign = TextAlign.Center
-            )
-            
-            Spacer(modifier = Modifier.weight(1f))
-            
-            // Empty space for symmetry
-            Spacer(modifier = Modifier.width(48.dp))
-        }
+        DateSelectorHeader(
+            displayDate = uiState.displayDate,
+            onPreviousClick = { onEvent(WishDetailEvent.NavigateToPreviousDate) },
+            onNextClick = { onEvent(WishDetailEvent.NavigateToNextDate) }
+        )
         
         // Scrollable content
         Column(
@@ -151,180 +96,40 @@ private fun WishDetailContent(
             verticalArrangement = Arrangement.spacedBy(15.dp)
         ) {
             // Main count display card
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(162.dp),
-                shape = RoundedCornerShape(5.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color.White
-                ),
-                elevation = CardDefaults.cardElevation(
-                    defaultElevation = 3.dp
+            CountDisplayCard(
+                count = uiState.displayCount,
+                isLoading = uiState.isLoading
+            )
+            
+            // Wish and motivational message cards
+            uiState.allMessages.forEachIndexed { index, message ->
+                MessageCard(
+                    message = message,
+                    backgroundColor = if (index == 2) Color(0xFFFAFAFA) else Color.White
                 )
-            ) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.Bottom
-                        ) {
-                            Text(
-                                text = (viewState.currentRecord?.totalCount ?: 0).toString()
-                                    .replace(Regex("(\\d)(?=(\\d{3})+(?!\\d))"), "$1,"),
-                                style = MaterialTheme.typography.displayLarge.copy(
-                                    fontSize = 48.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    lineHeight = 58.sp
-                                ),
-                                color = Purple_Medium
-                            )
-                            Spacer(modifier = Modifier.width(3.dp))
-                            Text(
-                                text = "회",
-                                style = MaterialTheme.typography.headlineMedium.copy(
-                                    fontSize = 30.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    lineHeight = 36.sp
-                                ),
-                                color = Text_Primary,
-                                modifier = Modifier.padding(bottom = 5.dp)
-                            )
-                        }
-                        
-                        Spacer(modifier = Modifier.height(6.dp))
-                        
-                        Text(
-                            text = "매일의 반복이 만든 숫자입니다.\n그 반복들이 오늘의 나를 만듭니다.",
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium,
-                                lineHeight = 16.sp
-                            ),
-                            color = Text_Primary.copy(alpha = 0.5f),
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
-            }
-            
-            // Wish text cards
-            if (viewState.currentRecord != null) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(45.dp),
-                    shape = RoundedCornerShape(5.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = Color.White
-                    ),
-                    elevation = CardDefaults.cardElevation(
-                        defaultElevation = 3.dp
-                    )
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 16.dp),
-                        contentAlignment = Alignment.CenterStart
-                    ) {
-                        Text(
-                            text = viewState.currentRecord.wishText,
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium
-                            ),
-                            color = Text_Primary
-                        )
-                    }
-                }
-            }
-            
-            // Additional motivational messages
-            viewState.motivationalMessages.take(2).forEachIndexed { index, message ->
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(45.dp),
-                    shape = RoundedCornerShape(5.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (index == 0) Color(0xFFFAFAFA) else Color.White
-                    ),
-                    elevation = CardDefaults.cardElevation(
-                        defaultElevation = 3.dp
-                    )
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 16.dp),
-                        contentAlignment = Alignment.CenterStart
-                    ) {
-                        Text(
-                            text = message,
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium
-                            ),
-                            color = Text_Primary
-                        )
-                    }
-                }
             }
             
             Spacer(modifier = Modifier.height(30.dp))
             
-            // Character images
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Card(
-                    modifier = Modifier.size(84.dp, 115.dp),
-                    shape = RoundedCornerShape(5.dp),
-                    elevation = CardDefaults.cardElevation(
-                        defaultElevation = 3.dp
-                    )
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.character_white),
-                        contentDescription = "White Character",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                }
-                
-                Spacer(modifier = Modifier.width(26.dp))
-                
-                Card(
-                    modifier = Modifier.size(89.dp, 115.dp),
-                    shape = RoundedCornerShape(5.dp),
-                    elevation = CardDefaults.cardElevation(
-                        defaultElevation = 3.dp
-                    )
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.character_black),
-                        contentDescription = "Black Character",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                }
-            }
+            // Character images at bottom
+            CharacterImagesRow()
         }
     }
     
     // Loading overlay
-    if (viewState.isLoading) {
+    if (uiState.isLoading) {
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
-            CircularProgressIndicator()
+            CircularProgressIndicator(color = Purple_Medium)
+        }
+    }
+    
+    // Error handling
+    uiState.error?.let { errorMessage ->
+        LaunchedEffect(errorMessage) {
+            // Could show error dialog or snackbar here
         }
     }
 }
@@ -332,8 +137,7 @@ private fun WishDetailContent(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun WishDetailTopBar(
-    onBackClick: () -> Unit,
-    onShareClick: () -> Unit
+    onBackClick: () -> Unit
 ) {
     TopAppBar(
         title = { },
@@ -341,125 +145,121 @@ private fun WishDetailTopBar(
             IconButton(onClick = onBackClick) {
                 Icon(
                     imageVector = Icons.Default.ArrowBack,
-                    contentDescription = "Back"
-                )
-            }
-        },
-        actions = {
-            IconButton(onClick = onShareClick) {
-                Icon(
-                    imageVector = Icons.Default.Share,
-                    contentDescription = "Share"
+                    contentDescription = "Back",
+                    tint = Text_Primary
                 )
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = Color.Transparent
+            containerColor = Background_Secondary
         )
     )
 }
 
 @Composable
-private fun StatisticsSection(
-    record: DailyRecord?,
-    weeklyStats: List<DailyRecord>,
-    modifier: Modifier = Modifier
+private fun DateSelectorHeader(
+    displayDate: String,
+    onPreviousClick: () -> Unit,
+    onNextClick: () -> Unit
 ) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(50.dp)
+            .background(Color.White)
+            .border(width = 0.5.dp, color = Color(0xFFC0C0C0)),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
+        IconButton(
+            onClick = onPreviousClick,
+            modifier = Modifier.padding(start = 17.dp)
         ) {
-            Text(
-                text = "이번 주 통계",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface
+            Icon(
+                imageVector = Icons.Default.ArrowBack,
+                contentDescription = "Previous Date",
+                tint = Text_Primary
             )
-            
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            // Weekly stats summary
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                StatItem(
-                    label = "총 카운트",
-                    value = weeklyStats.sumOf { it.totalCount }.toString()
-                )
-                StatItem(
-                    label = "달성률",
-                    value = "${calculateAchievementRate(weeklyStats)}%"
-                )
-                StatItem(
-                    label = "연속 일수",
-                    value = calculateStreak(weeklyStats).toString()
-                )
-            }
         }
+        
+        Spacer(modifier = Modifier.weight(1f))
+        
+        Text(
+            text = displayDate,
+            style = MaterialTheme.typography.bodyMedium.copy(
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium
+            ),
+            color = Text_Primary,
+            textAlign = TextAlign.Center
+        )
+        
+        Spacer(modifier = Modifier.weight(1f))
+        
+        // Empty space for symmetry
+        Spacer(modifier = Modifier.width(48.dp))
     }
 }
 
 @Composable
-private fun StatItem(
-    label: String,
-    value: String,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = value,
-            style = MaterialTheme.typography.headlineSmall,
-            color = MaterialTheme.colorScheme.primary
-        )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
-
-@Composable
-private fun AchievementSection(
-    achievements: List<String>,
-    modifier: Modifier = Modifier
+private fun CountDisplayCard(
+    count: String,
+    isLoading: Boolean
 ) {
     Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(162.dp),
+        shape = RoundedCornerShape(5.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = "달성 뱃지",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            // Achievement badges would go here
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                achievements.forEach { achievement ->
-                    AssistChip(
-                        onClick = { },
-                        label = { Text(achievement) }
+            if (isLoading) {
+                CircularProgressIndicator(color = Purple_Medium)
+            } else {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.Bottom
+                    ) {
+                        Text(
+                            text = count,
+                            style = MaterialTheme.typography.displayLarge.copy(
+                                fontSize = 48.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                lineHeight = 58.sp
+                            ),
+                            color = Purple_Medium
+                        )
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text(
+                            text = "회",
+                            style = MaterialTheme.typography.headlineMedium.copy(
+                                fontSize = 30.sp,
+                                fontWeight = FontWeight.Medium,
+                                lineHeight = 36.sp
+                            ),
+                            color = Text_Primary,
+                            modifier = Modifier.padding(bottom = 5.dp)
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(6.dp))
+                    
+                    Text(
+                        text = "매일의 반복이 만든 숫자입니다.\n그 반복들이 오늘의 나를 만듭니다.",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            lineHeight = 16.sp
+                        ),
+                        color = Text_Primary.copy(alpha = 0.5f),
+                        textAlign = TextAlign.Center
                     )
                 }
             }
@@ -467,30 +267,81 @@ private fun AchievementSection(
     }
 }
 
-// Helper functions
-private fun calculateAchievementRate(records: List<DailyRecord>): Int {
-    if (records.isEmpty()) return 0
-    val achieved = records.count { it.isCompleted }
-    return (achieved * 100 / records.size)
+@Composable
+private fun MessageCard(
+    message: String,
+    backgroundColor: Color = Color.White
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(45.dp),
+        shape = RoundedCornerShape(5.dp),
+        colors = CardDefaults.cardColors(containerColor = backgroundColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            contentAlignment = Alignment.CenterStart
+        ) {
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall.copy(
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium
+                ),
+                color = Text_Primary
+            )
+        }
+    }
 }
 
-private fun calculateStreak(records: List<DailyRecord>): Int {
-    return records.takeWhile { it.isCompleted }.size
+@Composable
+private fun CharacterImagesRow() {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center
+    ) {
+        Card(
+            modifier = Modifier.size(84.dp, 115.dp),
+            shape = RoundedCornerShape(5.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.character_white),
+                contentDescription = "White Character",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        }
+        
+        Spacer(modifier = Modifier.width(26.dp))
+        
+        Card(
+            modifier = Modifier.size(89.dp, 115.dp),
+            shape = RoundedCornerShape(5.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.character_black),
+                contentDescription = "Black Character",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        }
+    }
 }
 
 @Preview(showBackground = true, device = "id:pixel_5")
 @Composable
 fun WishDetailScreenPreview() {
     WishRingTheme {
-        val previewState = DetailViewState(
+        val previewState = WishDetailViewState(
             selectedDate = LocalDate.of(2025, 8, 21),
-            currentRecord = DailyRecord(
-                date = LocalDate.of(2025, 8, 21),
-                wishText = "나는 매일 성장하고 있다",
-                targetCount = 1000,
-                totalCount = 1000,
-                isCompleted = true
-            ),
+            totalCount = 1000,
+            wishText = "나는 매일 성장하고 있다",
             motivationalMessages = listOf(
                 "나는 어제보다 더 나은 내가 되고 있다.",
                 "오늘의 선택이 나를 더 단단하게 만든다.",
@@ -500,7 +351,7 @@ fun WishDetailScreenPreview() {
         )
         
         WishDetailContent(
-            viewState = previewState,
+            uiState = previewState,
             onEvent = {}
         )
     }

@@ -1,12 +1,16 @@
 package com.wishring.app.presentation.viewmodel
 
-import androidx.lifecycle.SavedStateHandle
+import android.content.Context
+import app.cash.turbine.test
 import com.wishring.app.domain.model.WishCount
 import com.wishring.app.domain.model.DailyRecord
 import com.wishring.app.domain.repository.WishCountRepository
 import com.wishring.app.domain.repository.PreferencesRepository
 import com.wishring.app.domain.repository.BleRepository
-import com.wishring.app.presentation.base.BaseViewModel
+import com.wishring.app.domain.repository.BleConnectionState
+import com.wishring.app.domain.repository.StreakInfo
+import com.wishring.app.data.local.database.entity.WishData
+import com.wishring.app.presentation.home.*
 import io.mockk.*
 import io.mockk.impl.annotations.MockK
 import kotlinx.coroutines.Dispatchers
@@ -18,17 +22,14 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 import org.junit.jupiter.params.provider.CsvSource
-import io.kotest.matchers.shouldBe
-import io.kotest.matchers.shouldNotBe
-import io.kotest.matchers.types.shouldBeInstanceOf
-import app.cash.turbine.test
-import java.time.LocalDate
-import java.time.LocalDateTime
 
 @ExperimentalCoroutinesApi
-@DisplayName("HomeViewModel 테스트")
+@DisplayName("HomeViewModel 테스트 - 새 아키텍처")
 class HomeViewModelTest {
 
+    @MockK
+    private lateinit var context: Context
+    
     @MockK
     private lateinit var wishCountRepository: WishCountRepository
     
@@ -38,9 +39,6 @@ class HomeViewModelTest {
     @MockK
     private lateinit var bleRepository: BleRepository
     
-    @MockK
-    private lateinit var savedStateHandle: SavedStateHandle
-    
     private lateinit var viewModel: HomeViewModel
     private val testDispatcher = StandardTestDispatcher()
     
@@ -49,9 +47,9 @@ class HomeViewModelTest {
         MockKAnnotations.init(this)
         Dispatchers.setMain(testDispatcher)
         
-        // Default mocks
-        every { savedStateHandle.get<Any>(any()) } returns null
-        every { savedStateHandle.set(any(), any<Any>()) } just Runs
+        // Default mocks for dependencies
+        every { context.packageName } returns "com.wishring.app"
+        setupDefaultMocks()
     }
     
     @AfterEach
@@ -61,7 +59,7 @@ class HomeViewModelTest {
     }
     
     @Nested
-    @DisplayName("초기화 및 상태 관리 테스트")
+    @DisplayName("초기화 및 데이터 로드 테스트")
     inner class InitializationTests {
         
         @Test
@@ -71,901 +69,412 @@ class HomeViewModelTest {
             setupDefaultMocks()
             
             // When
-            viewModel = HomeViewModel(
-                wishCountRepository = wishCountRepository,
-                preferencesRepository = preferencesRepository,
-                bleRepository = bleRepository,
-                savedStateHandle = savedStateHandle
-            )
+            viewModel = createViewModel()
             
             // Then
-            viewModel.viewState.test {
-                val initialState = awaitItem()
-                initialState.isLoading shouldBe true
-                initialState.todayCount shouldBe 0
-                initialState.dailyGoal shouldBe 100
-                initialState.progress shouldBe 0f
-                initialState.currentStreak shouldBe 0
-                initialState.isConnected shouldBe false
-            }
+            val initialState = viewModel.uiState.value
+            assertTrue(initialState.isLoading)
+            assertEquals(0, initialState.totalCount)
+            assertEquals(emptyList<WishData>(), initialState.todayWishes)
+            assertEquals(0, initialState.activeWishIndex)
         }
         
         @Test
-        @DisplayName("데이터 로드 성공")
-        fun `should load data successfully`() = runTest {
+        @DisplayName("오늘의 위시 데이터 로드 성공")
+        fun `should load today wishes successfully`() = runTest {
             // Given
-            val wishCount = WishCount(
-                date = LocalDate.now(),
-                count = 75,
-                dailyGoal = 100
+            val wishData = listOf(
+                WishData("위시 1", 1000),
+                WishData("위시 2", 2000)
             )
+            val totalCount = 500
+            val activeIndex = 1
             
-            every { wishCountRepository.getTodayWishCount() } returns flowOf(wishCount)
-            every { preferencesRepository.getDailyGoalFlow() } returns flowOf(100)
-            every { wishCountRepository.getCurrentStreak() } coReturns 5
-            every { bleRepository.connectionState } returns flowOf(BleConnectionState.Connected("device"))
+            coEvery { wishCountRepository.getTodayWishes() } returns wishData
+            coEvery { wishCountRepository.getActiveWishIndex() } returns activeIndex
+            val mockWishCount = WishCount.createDefault().copy(totalCount = totalCount)
+            coEvery { wishCountRepository.getTodayWishCount() } returns mockWishCount
             
             // When
-            viewModel = HomeViewModel(
-                wishCountRepository = wishCountRepository,
-                preferencesRepository = preferencesRepository,
-                bleRepository = bleRepository,
-                savedStateHandle = savedStateHandle
-            )
-            
-            advanceUntilIdle()
+            viewModel = createViewModel()
+            testDispatcher.scheduler.advanceUntilIdle()
             
             // Then
-            viewModel.viewState.test {
-                val state = expectMostRecentItem()
-                state.isLoading shouldBe false
-                state.todayCount shouldBe 75
-                state.dailyGoal shouldBe 100
-                state.progress shouldBe 0.75f
-                state.currentStreak shouldBe 5
-                state.isConnected shouldBe true
+            viewModel.uiState.test {
+                val state = awaitItem()
+                assertFalse(state.isLoading)
+                assertEquals(wishData, state.todayWishes)
+                assertEquals(activeIndex, state.activeWishIndex)
+                assertEquals(totalCount, state.totalCount)
+                assertEquals(2000, state.targetCount) // 활성 위시의 targetCount
             }
         }
         
         @Test
-        @DisplayName("로딩 에러 처리")
+        @DisplayName("데이터 로드 에러 처리")
         fun `should handle loading error`() = runTest {
             // Given
-            every { wishCountRepository.getTodayWishCount() } returns flow {
-                throw Exception("Database error")
-            }
-            every { preferencesRepository.getDailyGoalFlow() } returns flowOf(100)
-            every { bleRepository.connectionState } returns flowOf(BleConnectionState.Disconnected)
+            coEvery { wishCountRepository.getTodayWishes() } throws RuntimeException("Database error")
             
             // When
-            viewModel = HomeViewModel(
-                wishCountRepository = wishCountRepository,
-                preferencesRepository = preferencesRepository,
-                bleRepository = bleRepository,
-                savedStateHandle = savedStateHandle
-            )
-            
-            advanceUntilIdle()
+            viewModel = createViewModel()
+            testDispatcher.scheduler.advanceUntilIdle()
             
             // Then
-            viewModel.effect.test {
-                val effect = awaitItem()
-                effect.shouldBeInstanceOf<HomeEffect.ShowError>()
-                (effect as HomeEffect.ShowError).message shouldBe "Database error"
+            viewModel.uiState.test {
+                val state = awaitItem()
+                assertFalse(state.isLoading)
+                assertNotNull(state.error)
+                assertTrue(state.error!!.contains("Database error"))
             }
         }
     }
     
     @Nested
-    @DisplayName("사용자 이벤트 처리 테스트")
-    inner class EventHandlingTests {
+    @DisplayName("BLE 통합 테스트")
+    inner class BleIntegrationTests {
         
         @Test
-        @DisplayName("위시 카운트 증가 이벤트")
-        fun `should handle increment wish count event`() = runTest {
+        @DisplayName("BLE 연결 상태 변경 처리")
+        fun `should handle BLE connection state changes`() = runTest {
             // Given
-            setupDefaultMocks()
-            coEvery { wishCountRepository.incrementCount() } just Runs
-            
-            viewModel = HomeViewModel(
-                wishCountRepository = wishCountRepository,
-                preferencesRepository = preferencesRepository,
-                bleRepository = bleRepository,
-                savedStateHandle = savedStateHandle
-            )
+            val connectionStateFlow = MutableStateFlow(BleConnectionState.DISCONNECTED)
+            every { bleRepository.getConnectionState() } returns connectionStateFlow
             
             // When
-            viewModel.handleEvent(HomeEvent.IncrementWishCount)
-            advanceUntilIdle()
-            
-            // Then
-            coVerify { wishCountRepository.incrementCount() }
-            
-            viewModel.effect.test {
-                val effect = awaitItem()
-                effect.shouldBeInstanceOf<HomeEffect.ShowCountAnimation>()
-            }
-        }
-        
-        @Test
-        @DisplayName("수동 리셋 이벤트")
-        fun `should handle manual reset event`() = runTest {
-            // Given
-            setupDefaultMocks()
-            coEvery { wishCountRepository.resetCount(any()) } just Runs
-            
-            viewModel = HomeViewModel(
-                wishCountRepository = wishCountRepository,
-                preferencesRepository = preferencesRepository,
-                bleRepository = bleRepository,
-                savedStateHandle = savedStateHandle
-            )
-            
-            // When
-            viewModel.handleEvent(HomeEvent.ResetCount)
-            advanceUntilIdle()
-            
-            // Then
-            coVerify { wishCountRepository.resetCount(ResetReason.MANUAL) }
-            
-            viewModel.effect.test {
-                val effect = awaitItem()
-                effect.shouldBeInstanceOf<HomeEffect.ShowResetConfirmation>()
-            }
-        }
-        
-        @Test
-        @DisplayName("BLE 연결 토글 이벤트")
-        fun `should handle BLE connection toggle`() = runTest {
-            // Given
-            setupDefaultMocks()
-            every { bleRepository.connectionState } returns MutableStateFlow(BleConnectionState.Disconnected)
-            coEvery { bleRepository.connect(any()) } just Runs
-            coEvery { bleRepository.disconnect() } just Runs
-            
-            viewModel = HomeViewModel(
-                wishCountRepository = wishCountRepository,
-                preferencesRepository = preferencesRepository,
-                bleRepository = bleRepository,
-                savedStateHandle = savedStateHandle
-            )
-            
-            // When - Connect
-            viewModel.handleEvent(HomeEvent.ToggleBleConnection)
-            advanceUntilIdle()
-            
-            // Then
-            coVerify { bleRepository.connect(any()) }
-            
-            // When - Disconnect
-            viewModel.updateState { copy(isConnected = true) }
-            viewModel.handleEvent(HomeEvent.ToggleBleConnection)
-            advanceUntilIdle()
-            
-            // Then
-            coVerify { bleRepository.disconnect() }
-        }
-        
-        @Test
-        @DisplayName("새로고침 이벤트")
-        fun `should handle refresh event`() = runTest {
-            // Given
-            setupDefaultMocks()
-            coEvery { wishCountRepository.getCurrentStreak() } coReturnsMany listOf(3, 5)
-            
-            viewModel = HomeViewModel(
-                wishCountRepository = wishCountRepository,
-                preferencesRepository = preferencesRepository,
-                bleRepository = bleRepository,
-                savedStateHandle = savedStateHandle
-            )
-            
-            // When
-            viewModel.handleEvent(HomeEvent.Refresh)
-            advanceUntilIdle()
-            
-            // Then
-            viewModel.viewState.test {
-                val state = expectMostRecentItem()
-                state.isRefreshing shouldBe false
-                state.currentStreak shouldBe 5
-            }
-        }
-    }
-    
-    @Nested
-    @DisplayName("목표 달성 로직 테스트")
-    inner class GoalAchievementTests {
-        
-        @ParameterizedTest
-        @CsvSource(
-            "100,100,true",
-            "99,100,false",
-            "150,100,true",
-            "0,100,false"
-        )
-        @DisplayName("목표 달성 판단")
-        fun `should determine goal achievement correctly`(
-            count: Int,
-            goal: Int,
-            expected: Boolean
-        ) = runTest {
-            // Given
-            val wishCount = WishCount(
-                date = LocalDate.now(),
-                count = count,
-                dailyGoal = goal
-            )
-            
-            every { wishCountRepository.getTodayWishCount() } returns flowOf(wishCount)
-            every { preferencesRepository.getDailyGoalFlow() } returns flowOf(goal)
-            setupBleAndStreakMocks()
-            
-            // When
-            viewModel = HomeViewModel(
-                wishCountRepository = wishCountRepository,
-                preferencesRepository = preferencesRepository,
-                bleRepository = bleRepository,
-                savedStateHandle = savedStateHandle
-            )
-            
-            advanceUntilIdle()
-            
-            // Then
-            viewModel.viewState.test {
-                val state = expectMostRecentItem()
-                state.isGoalAchieved shouldBe expected
-            }
-            
-            if (expected) {
-                viewModel.effect.test {
-                    val effect = awaitItem()
-                    effect.shouldBeInstanceOf<HomeEffect.ShowGoalAchievement>()
-                }
-            }
-        }
-        
-        @Test
-        @DisplayName("목표 달성 시 자동 리셋 옵션")
-        fun `should auto reset on goal achievement if enabled`() = runTest {
-            // Given
-            val wishCount = WishCount(
-                date = LocalDate.now(),
-                count = 100,
-                dailyGoal = 100
-            )
-            
-            every { wishCountRepository.getTodayWishCount() } returns flowOf(wishCount)
-            every { preferencesRepository.getDailyGoalFlow() } returns flowOf(100)
-            every { preferencesRepository.isAutoResetOnGoal() } coReturns true
-            coEvery { wishCountRepository.resetCount(ResetReason.GOAL_ACHIEVED) } just Runs
-            setupBleAndStreakMocks()
-            
-            // When
-            viewModel = HomeViewModel(
-                wishCountRepository = wishCountRepository,
-                preferencesRepository = preferencesRepository,
-                bleRepository = bleRepository,
-                savedStateHandle = savedStateHandle
-            )
-            
-            advanceUntilIdle()
-            
-            // Then
-            coVerify { wishCountRepository.resetCount(ResetReason.GOAL_ACHIEVED) }
-        }
-    }
-    
-    @Nested
-    @DisplayName("통계 업데이트 테스트")
-    inner class StatisticsUpdateTests {
-        
-        @Test
-        @DisplayName("주간 통계 조회")
-        fun `should load weekly statistics`() = runTest {
-            // Given
-            setupDefaultMocks()
-            val weeklyStats = WeeklyStatistics(
-                totalCount = 500,
-                averageCount = 71.4,
-                achievementDays = 5
-            )
-            
-            coEvery { wishCountRepository.getWeeklyStatistics() } returns weeklyStats
-            
-            viewModel = HomeViewModel(
-                wishCountRepository = wishCountRepository,
-                preferencesRepository = preferencesRepository,
-                bleRepository = bleRepository,
-                savedStateHandle = savedStateHandle
-            )
-            
-            // When
-            viewModel.handleEvent(HomeEvent.LoadStatistics)
-            advanceUntilIdle()
-            
-            // Then
-            viewModel.viewState.test {
-                val state = expectMostRecentItem()
-                state.weeklyStats shouldBe weeklyStats
-            }
-        }
-        
-        @Test
-        @DisplayName("최근 7일 기록 조회")
-        fun `should load recent records`() = runTest {
-            // Given
-            setupDefaultMocks()
-            val recentRecords = (0..6).map { day ->
-                DailyRecord(
-                    date = LocalDate.now().minusDays(day.toLong()),
-                    count = 50 + day * 10,
-                    goalAchieved = day % 2 == 0
-                )
-            }
-            
-            coEvery { wishCountRepository.getRecentRecords(7) } returns recentRecords
-            
-            viewModel = HomeViewModel(
-                wishCountRepository = wishCountRepository,
-                preferencesRepository = preferencesRepository,
-                bleRepository = bleRepository,
-                savedStateHandle = savedStateHandle
-            )
-            
-            // When
-            viewModel.handleEvent(HomeEvent.LoadRecentRecords)
-            advanceUntilIdle()
-            
-            // Then
-            viewModel.viewState.test {
-                val state = expectMostRecentItem()
-                state.recentRecords shouldBe recentRecords
-            }
-        }
-    }
-    
-    @Nested
-    @DisplayName("BLE 상태 동기화 테스트")
-    inner class BleStateSyncTests {
-        
-        @Test
-        @DisplayName("BLE 연결 상태 변경 감지")
-        fun `should detect BLE connection state changes`() = runTest {
-            // Given
-            val connectionStateFlow = MutableStateFlow<BleConnectionState>(
-                BleConnectionState.Disconnected
-            )
-            
-            setupDefaultMocksWithCustomBle(connectionStateFlow)
-            
-            viewModel = HomeViewModel(
-                wishCountRepository = wishCountRepository,
-                preferencesRepository = preferencesRepository,
-                bleRepository = bleRepository,
-                savedStateHandle = savedStateHandle
-            )
+            viewModel = createViewModel()
             
             // Then - Initially disconnected
-            viewModel.viewState.test {
-                expectMostRecentItem().isConnected shouldBe false
+            viewModel.uiState.test {
+                val state = awaitItem()
+                assertEquals(BleConnectionState.DISCONNECTED, state.bleConnectionState)
+                assertFalse(state.isBleConnected)
             }
             
             // When - Connect
-            connectionStateFlow.value = BleConnectionState.Connecting
-            advanceUntilIdle()
+            connectionStateFlow.value = BleConnectionState.CONNECTED
+            testDispatcher.scheduler.advanceUntilIdle()
             
-            viewModel.viewState.test {
-                expectMostRecentItem().isConnecting shouldBe true
-            }
-            
-            // When - Connected
-            connectionStateFlow.value = BleConnectionState.Connected("device_address")
-            advanceUntilIdle()
-            
-            viewModel.viewState.test {
-                val state = expectMostRecentItem()
-                state.isConnected shouldBe true
-                state.isConnecting shouldBe false
-                state.connectedDeviceAddress shouldBe "device_address"
+            viewModel.uiState.test {
+                val state = awaitItem()
+                assertEquals(BleConnectionState.CONNECTED, state.bleConnectionState)
+                assertTrue(state.isBleConnected)
             }
         }
         
         @Test
-        @DisplayName("BLE 버튼 프레스 이벤트 수신")
-        fun `should receive BLE button press events`() = runTest {
+        @DisplayName("BLE 카운터 증가 이벤트 처리")
+        fun `should handle BLE counter increment events`() = runTest {
             // Given
-            val buttonEventFlow = MutableSharedFlow<BleButtonEvent>()
-            
-            setupDefaultMocks()
-            every { bleRepository.buttonEvents } returns buttonEventFlow
-            coEvery { wishCountRepository.incrementCount() } just Runs
-            
-            viewModel = HomeViewModel(
-                wishCountRepository = wishCountRepository,
-                preferencesRepository = preferencesRepository,
-                bleRepository = bleRepository,
-                savedStateHandle = savedStateHandle
-            )
+            val counterFlow = MutableSharedFlow<Int>()
+            every { bleRepository.counterIncrements } returns counterFlow
+            coEvery { wishCountRepository.incrementTodayCount(any()) } returns WishCount.createDefault()
             
             // When
-            buttonEventFlow.emit(BleButtonEvent.SinglePress)
-            advanceUntilIdle()
+            viewModel = createViewModel()
+            testDispatcher.scheduler.advanceUntilIdle()
             
-            // Then
-            coVerify { wishCountRepository.incrementCount() }
+            // When - BLE sends increment
+            counterFlow.emit(1)
+            testDispatcher.scheduler.advanceUntilIdle()
             
-            viewModel.effect.test {
-                val effect = awaitItem()
-                effect.shouldBeInstanceOf<HomeEffect.ShowCountAnimation>()
-            }
+            // Then - Repository should be called
+            coVerify { wishCountRepository.incrementTodayCount(1) }
         }
         
         @Test
-        @DisplayName("BLE 배터리 레벨 업데이트")
-        fun `should update battery level from BLE`() = runTest {
+        @DisplayName("배터리 레벨 업데이트")
+        fun `should update battery level`() = runTest {
             // Given
-            val batteryFlow = MutableStateFlow(85)
+            val batteryFlow = MutableStateFlow<Int?>(85)
+            every { bleRepository.subscribeToBatteryLevel() } returns batteryFlow.filterNotNull()
             
-            setupDefaultMocks()
-            every { bleRepository.batteryLevel } returns batteryFlow
-            
-            viewModel = HomeViewModel(
-                wishCountRepository = wishCountRepository,
-                preferencesRepository = preferencesRepository,
-                bleRepository = bleRepository,
-                savedStateHandle = savedStateHandle
-            )
-            
-            advanceUntilIdle()
+            // When
+            viewModel = createViewModel()
+            testDispatcher.scheduler.advanceUntilIdle()
             
             // Then
-            viewModel.viewState.test {
-                expectMostRecentItem().batteryLevel shouldBe 85
+            viewModel.uiState.test {
+                val state = awaitItem()
+                assertEquals(85, state.deviceBatteryLevel)
             }
             
             // When - Battery level changes
-            batteryFlow.value = 50
-            advanceUntilIdle()
+            batteryFlow.value = 20
+            testDispatcher.scheduler.advanceUntilIdle()
             
-            viewModel.viewState.test {
-                expectMostRecentItem().batteryLevel shouldBe 50
-            }
-            
-            // When - Low battery
-            batteryFlow.value = 15
-            advanceUntilIdle()
-            
-            viewModel.effect.test {
-                val effect = awaitItem()
-                effect.shouldBeInstanceOf<HomeEffect.ShowLowBatteryWarning>()
-            }
-        }
-    }
-    
-    @Nested
-    @DisplayName("상태 복원 테스트")
-    inner class StateRestorationTests {
-        
-        @Test
-        @DisplayName("SavedStateHandle에서 상태 복원")
-        fun `should restore state from SavedStateHandle`() = runTest {
-            // Given
-            every { savedStateHandle.get<Int>("todayCount") } returns 75
-            every { savedStateHandle.get<Int>("dailyGoal") } returns 150
-            every { savedStateHandle.get<Int>("currentStreak") } returns 10
-            every { savedStateHandle.get<Boolean>("isConnected") } returns true
-            
-            setupDefaultMocks()
-            
-            // When
-            viewModel = HomeViewModel(
-                wishCountRepository = wishCountRepository,
-                preferencesRepository = preferencesRepository,
-                bleRepository = bleRepository,
-                savedStateHandle = savedStateHandle
-            )
-            
-            // Then
-            viewModel.viewState.test {
+            viewModel.uiState.test {
                 val state = awaitItem()
-                state.todayCount shouldBe 75
-                state.dailyGoal shouldBe 150
-                state.currentStreak shouldBe 10
-                state.isConnected shouldBe true
-            }
-        }
-        
-        @Test
-        @DisplayName("상태 변경 시 SavedStateHandle 업데이트")
-        fun `should update SavedStateHandle on state change`() = runTest {
-            // Given
-            setupDefaultMocks()
-            
-            viewModel = HomeViewModel(
-                wishCountRepository = wishCountRepository,
-                preferencesRepository = preferencesRepository,
-                bleRepository = bleRepository,
-                savedStateHandle = savedStateHandle
-            )
-            
-            // When
-            viewModel.updateState {
-                copy(todayCount = 100, currentStreak = 15)
-            }
-            
-            // Then
-            verify {
-                savedStateHandle.set("todayCount", 100)
-                savedStateHandle.set("currentStreak", 15)
+                assertEquals(20, state.deviceBatteryLevel)
+                assertTrue(state.showLowBatteryWarning)
             }
         }
     }
     
     @Nested
-    @DisplayName("동시성 및 레이스 컨디션 테스트")
-    inner class ConcurrencyTests {
+    @DisplayName("위시 네비게이션 테스트")
+    inner class WishNavigationTests {
         
         @Test
-        @DisplayName("빠른 연속 증가 요청 처리")
-        fun `should handle rapid increment requests`() = runTest {
+        @DisplayName("다음 위시로 네비게이션")
+        fun `should navigate to next wish`() = runTest {
             // Given
-            setupDefaultMocks()
-            var incrementCount = 0
-            coEvery { wishCountRepository.incrementCount() } coAnswers {
-                incrementCount++
-            }
-            
-            viewModel = HomeViewModel(
-                wishCountRepository = wishCountRepository,
-                preferencesRepository = preferencesRepository,
-                bleRepository = bleRepository,
-                savedStateHandle = savedStateHandle
+            val wishData = listOf(
+                WishData("위시 1", 1000),
+                WishData("위시 2", 2000),
+                WishData("위시 3", 3000)
             )
             
-            // When - 10 rapid increments
-            repeat(10) {
-                viewModel.handleEvent(HomeEvent.IncrementWishCount)
-            }
-            advanceUntilIdle()
+            coEvery { wishCountRepository.getTodayWishes() } returns wishData
+            coEvery { wishCountRepository.getActiveWishIndex() } returns 0
+            coEvery { wishCountRepository.setActiveWishIndex(any()) } returns WishCount.createDefault()
             
-            // Then - All increments should be processed
-            incrementCount shouldBe 10
-        }
-        
-        @Test
-        @DisplayName("동시 데이터 소스 업데이트 처리")
-        fun `should handle concurrent data source updates`() = runTest {
-            // Given
-            val wishCountFlow = MutableStateFlow(
-                WishCount(date = LocalDate.now(), count = 0, dailyGoal = 100)
-            )
-            val goalFlow = MutableStateFlow(100)
+            viewModel = createViewModel()
+            testDispatcher.scheduler.advanceUntilIdle()
             
-            every { wishCountRepository.getTodayWishCount() } returns wishCountFlow
-            every { preferencesRepository.getDailyGoalFlow() } returns goalFlow
-            setupBleAndStreakMocks()
-            
-            viewModel = HomeViewModel(
-                wishCountRepository = wishCountRepository,
-                preferencesRepository = preferencesRepository,
-                bleRepository = bleRepository,
-                savedStateHandle = savedStateHandle
-            )
-            
-            // When - Update both flows simultaneously
-            wishCountFlow.value = WishCount(
-                date = LocalDate.now(), 
-                count = 50, 
-                dailyGoal = 100
-            )
-            goalFlow.value = 200
-            advanceUntilIdle()
+            // When
+            viewModel.onEvent(HomeEvent.NavigateToNextWish)
+            testDispatcher.scheduler.advanceUntilIdle()
             
             // Then
-            viewModel.viewState.test {
-                val state = expectMostRecentItem()
-                state.todayCount shouldBe 50
-                state.dailyGoal shouldBe 200
-                state.progress shouldBe 0.25f // 50/200
+            coVerify { wishCountRepository.setActiveWishIndex(1) }
+        }
+        
+        @Test
+        @DisplayName("이전 위시로 네비게이션")
+        fun `should navigate to previous wish`() = runTest {
+            // Given
+            val wishData = listOf(
+                WishData("위시 1", 1000),
+                WishData("위시 2", 2000),
+                WishData("위시 3", 3000)
+            )
+            
+            coEvery { wishCountRepository.getTodayWishes() } returns wishData
+            coEvery { wishCountRepository.getActiveWishIndex() } returns 2 // 마지막 위시
+            coEvery { wishCountRepository.setActiveWishIndex(any()) } returns WishCount.createDefault()
+            
+            viewModel = createViewModel()
+            testDispatcher.scheduler.advanceUntilIdle()
+            
+            // When
+            viewModel.onEvent(HomeEvent.NavigateToPreviousWish)
+            testDispatcher.scheduler.advanceUntilIdle()
+            
+            // Then
+            coVerify { wishCountRepository.setActiveWishIndex(1) }
+        }
+        
+        @Test
+        @DisplayName("특정 위시 선택")
+        fun `should select specific wish`() = runTest {
+            // Given
+            val wishData = listOf(
+                WishData("위시 1", 1000),
+                WishData("위시 2", 2000),
+                WishData("위시 3", 3000)
+            )
+            
+            coEvery { wishCountRepository.getTodayWishes() } returns wishData
+            coEvery { wishCountRepository.getActiveWishIndex() } returns 0
+            coEvery { wishCountRepository.setActiveWishIndex(any()) } returns WishCount.createDefault()
+            
+            viewModel = createViewModel()
+            testDispatcher.scheduler.advanceUntilIdle()
+            
+            // When
+            viewModel.onEvent(HomeEvent.SelectWish(2))
+            testDispatcher.scheduler.advanceUntilIdle()
+            
+            // Then
+            coVerify { wishCountRepository.setActiveWishIndex(2) }
+        }
+        
+        @ParameterizedTest
+        @ValueSource(ints = [0, 1, 2])
+        @DisplayName("경계값 위시 인덱스 처리")
+        fun `should handle boundary wish indices`(index: Int) = runTest {
+            // Given
+            val wishData = (1..3).map { WishData("위시 $it", it * 1000) }
+            
+            coEvery { wishCountRepository.getTodayWishes() } returns wishData
+            coEvery { wishCountRepository.getActiveWishIndex() } returns 0
+            coEvery { wishCountRepository.setActiveWishIndex(any()) } returns WishCount.createDefault()
+            
+            viewModel = createViewModel()
+            testDispatcher.scheduler.advanceUntilIdle()
+            
+            // When
+            viewModel.onEvent(HomeEvent.SelectWish(index))
+            testDispatcher.scheduler.advanceUntilIdle()
+            
+            // Then
+            coVerify { wishCountRepository.setActiveWishIndex(index) }
+        }
+    }
+    
+    @Nested
+    @DisplayName("데이터 새로고침 테스트")
+    inner class RefreshTests {
+        
+        @Test
+        @DisplayName("데이터 새로고침 성공")
+        fun `should refresh data successfully`() = runTest {
+            // Given
+            val initialWishes = listOf(WishData("위시 1", 1000))
+            val refreshedWishes = listOf(
+                WishData("위시 1", 1000),
+                WishData("위시 2", 2000)
+            )
+            
+            coEvery { wishCountRepository.getTodayWishes() } returnsMany listOf(initialWishes, refreshedWishes)
+            coEvery { wishCountRepository.getActiveWishIndex() } returns 0
+            coEvery { wishCountRepository.getTodayWishCount() } returns WishCount.createDefault()
+            
+            viewModel = createViewModel()
+            testDispatcher.scheduler.advanceUntilIdle()
+            
+            // When
+            viewModel.onEvent(HomeEvent.RefreshData)
+            testDispatcher.scheduler.advanceUntilIdle()
+            
+            // Then
+            viewModel.uiState.test {
+                val state = awaitItem()
+                assertFalse(state.isRefreshing)
+                assertEquals(refreshedWishes, state.todayWishes)
+            }
+        }
+        
+        @Test
+        @DisplayName("새로고침 중 상태 표시")
+        fun `should show refreshing state`() = runTest {
+            // Given
+            viewModel = createViewModel()
+            testDispatcher.scheduler.advanceUntilIdle()
+            
+            // When
+            viewModel.onEvent(HomeEvent.RefreshData)
+            
+            // Then - 새로고침 상태가 즉시 반영되어야 함
+            viewModel.uiState.test {
+                val state = awaitItem()
+                assertTrue(state.isRefreshing)
             }
         }
     }
     
-    // Helper functions
+    @Nested
+    @DisplayName("목표 달성 및 진행률 테스트")
+    inner class ProgressTests {
+        
+        @ParameterizedTest
+        @CsvSource(
+            "0,1000,0.0,false",
+            "500,1000,0.5,false", 
+            "1000,1000,1.0,true",
+            "1500,1000,1.0,true"
+        )
+        @DisplayName("진행률 계산 및 목표 달성 판단")
+        fun `should calculate progress and goal achievement correctly`(
+            totalCount: Int,
+            targetCount: Int,
+            expectedProgress: Float,
+            expectedCompleted: Boolean
+        ) = runTest {
+            // Given
+            val wishData = listOf(WishData("위시", targetCount))
+            val wishCount = WishCount.createDefault().copy(totalCount = totalCount)
+            
+            coEvery { wishCountRepository.getTodayWishes() } returns wishData
+            coEvery { wishCountRepository.getActiveWishIndex() } returns 0
+            coEvery { wishCountRepository.getTodayWishCount() } returns wishCount
+            
+            // When
+            viewModel = createViewModel()
+            testDispatcher.scheduler.advanceUntilIdle()
+            
+            // Then
+            viewModel.uiState.test {
+                val state = awaitItem()
+                assertEquals(expectedProgress, state.progress, 0.01f)
+                assertEquals(expectedCompleted, state.isCompleted)
+                assertEquals(totalCount, state.totalCount)
+                assertEquals(targetCount, state.targetCount)
+            }
+        }
+    }
+    
+    @Nested
+    @DisplayName("에러 처리 테스트")
+    inner class ErrorHandlingTests {
+        
+        @Test
+        @DisplayName("에러 상태 해제")
+        fun `should dismiss error`() = runTest {
+            // Given
+            viewModel = createViewModel()
+            
+            // 에러 상태 설정
+            viewModel.updateState { copy(error = "Test error") }
+            
+            // When
+            viewModel.onEvent(HomeEvent.DismissError)
+            
+            // Then
+            viewModel.uiState.test {
+                val state = awaitItem()
+                assertNull(state.error)
+            }
+        }
+        
+        @Test
+        @DisplayName("BLE 연결 에러 처리")
+        fun `should handle BLE connection error`() = runTest {
+            // Given
+            every { bleRepository.getConnectionState() } returns flowOf(BleConnectionState.ERROR)
+            
+            // When
+            viewModel = createViewModel()
+            testDispatcher.scheduler.advanceUntilIdle()
+            
+            // Then
+            viewModel.uiState.test {
+                val state = awaitItem()
+                assertEquals(BleConnectionState.ERROR, state.bleConnectionState)
+            }
+        }
+    }
+    
+    // Helper methods
+    private fun createViewModel(): HomeViewModel {
+        return HomeViewModel(
+            context = context,
+            wishCountRepository = wishCountRepository,
+            bleRepository = bleRepository,
+            preferencesRepository = preferencesRepository
+        )
+    }
+    
     private fun setupDefaultMocks() {
-        every { wishCountRepository.getTodayWishCount() } returns flowOf(
-            WishCount(date = LocalDate.now(), count = 0, dailyGoal = 100)
-        )
-        every { preferencesRepository.getDailyGoalFlow() } returns flowOf(100)
-        every { bleRepository.connectionState } returns flowOf(BleConnectionState.Disconnected)
-        every { bleRepository.buttonEvents } returns emptyFlow()
-        every { bleRepository.batteryLevel } returns flowOf(100)
-        coEvery { wishCountRepository.getCurrentStreak() } returns 0
-        coEvery { wishCountRepository.getWeeklyStatistics() } returns WeeklyStatistics(0, 0.0, 0)
-        coEvery { wishCountRepository.getRecentRecords(any()) } returns emptyList()
-        coEvery { preferencesRepository.isAutoResetOnGoal() } returns false
-    }
-    
-    private fun setupBleAndStreakMocks() {
-        every { bleRepository.connectionState } returns flowOf(BleConnectionState.Disconnected)
-        every { bleRepository.buttonEvents } returns emptyFlow()
-        every { bleRepository.batteryLevel } returns flowOf(100)
-        coEvery { wishCountRepository.getCurrentStreak() } returns 0
-    }
-    
-    private fun setupDefaultMocksWithCustomBle(connectionFlow: StateFlow<BleConnectionState>) {
-        every { wishCountRepository.getTodayWishCount() } returns flowOf(
-            WishCount(date = LocalDate.now(), count = 0, dailyGoal = 100)
-        )
-        every { preferencesRepository.getDailyGoalFlow() } returns flowOf(100)
-        every { bleRepository.connectionState } returns connectionFlow
-        every { bleRepository.buttonEvents } returns emptyFlow()
-        every { bleRepository.batteryLevel } returns flowOf(100)
-        coEvery { wishCountRepository.getCurrentStreak() } returns 0
-    }
-}
-
-// Mock ViewModel implementation
-class HomeViewModel(
-    private val wishCountRepository: WishCountRepository,
-    private val preferencesRepository: PreferencesRepository,
-    private val bleRepository: BleRepository,
-    private val savedStateHandle: SavedStateHandle
-) : BaseViewModel<HomeViewState, HomeEvent, HomeEffect>(
-    initialState = HomeViewState()
-) {
-    
-    init {
-        loadInitialData()
-        observeDataSources()
-        observeBleEvents()
-        restoreState()
-    }
-    
-    override fun handleEvent(event: HomeEvent) {
-        when (event) {
-            is HomeEvent.IncrementWishCount -> incrementCount()
-            is HomeEvent.ResetCount -> resetCount()
-            is HomeEvent.ToggleBleConnection -> toggleBleConnection()
-            is HomeEvent.Refresh -> refresh()
-            is HomeEvent.LoadStatistics -> loadStatistics()
-            is HomeEvent.LoadRecentRecords -> loadRecentRecords()
-        }
-    }
-    
-    private fun loadInitialData() {
-        launch {
-            try {
-                val streak = wishCountRepository.getCurrentStreak()
-                updateState { copy(currentStreak = streak, isLoading = false) }
-            } catch (e: Exception) {
-                sendEffect(HomeEffect.ShowError(e.message ?: "Unknown error"))
-            }
-        }
-    }
-    
-    private fun observeDataSources() {
-        // Observe wish count
-        wishCountRepository.getTodayWishCount()
-            .onEach { wishCount ->
-                val count = wishCount?.count ?: 0
-                val goal = wishCount?.dailyGoal ?: 100
-                updateState { 
-                    copy(
-                        todayCount = count,
-                        dailyGoal = goal,
-                        progress = count.toFloat() / goal,
-                        isGoalAchieved = count >= goal
-                    )
-                }
-                
-                if (count >= goal) {
-                    handleGoalAchievement()
-                }
-            }
-            .launchIn(viewModelScope)
+        // WishCountRepository mocks
+        coEvery { wishCountRepository.getTodayWishes() } returns emptyList()
+        coEvery { wishCountRepository.getActiveWishIndex() } returns 0
+        coEvery { wishCountRepository.getTodayWishCount() } returns WishCount.createDefault()
+        coEvery { wishCountRepository.getDailyRecords(any()) } returns emptyList()
+        coEvery { wishCountRepository.getStreakInfo() } returns StreakInfo(0, 0, null, null, false)
+        coEvery { wishCountRepository.setActiveWishIndex(any()) } returns WishCount.createDefault()
+        coEvery { wishCountRepository.incrementTodayCount(any()) } returns WishCount.createDefault()
         
-        // Observe daily goal preference
-        preferencesRepository.getDailyGoalFlow()
-            .onEach { goal ->
-                updateState { 
-                    copy(
-                        dailyGoal = goal,
-                        progress = todayCount.toFloat() / goal
-                    )
-                }
-            }
-            .launchIn(viewModelScope)
+        // BleRepository mocks
+        every { bleRepository.getConnectionState() } returns flowOf(BleConnectionState.DISCONNECTED)
+        every { bleRepository.counterIncrements } returns emptyFlow()
+        every { bleRepository.subscribeToBatteryLevel() } returns flowOf(100)
         
-        // Observe BLE connection state
-        bleRepository.connectionState
-            .onEach { state ->
-                updateState {
-                    when (state) {
-                        is BleConnectionState.Connected -> copy(
-                            isConnected = true,
-                            isConnecting = false,
-                            connectedDeviceAddress = state.deviceAddress
-                        )
-                        is BleConnectionState.Connecting -> copy(
-                            isConnecting = true
-                        )
-                        is BleConnectionState.Disconnected -> copy(
-                            isConnected = false,
-                            isConnecting = false,
-                            connectedDeviceAddress = null
-                        )
-                    }
-                }
-            }
-            .launchIn(viewModelScope)
-        
-        // Observe battery level
-        bleRepository.batteryLevel
-            .onEach { level ->
-                updateState { copy(batteryLevel = level) }
-                if (level <= 20) {
-                    sendEffect(HomeEffect.ShowLowBatteryWarning)
-                }
-            }
-            .launchIn(viewModelScope)
+        // PreferencesRepository mocks
+        coEvery { preferencesRepository.getDefaultWishText() } returns "기본 위시"
+        coEvery { preferencesRepository.getDefaultTargetCount() } returns 1000
+        coEvery { preferencesRepository.isBleAutoConnectEnabled() } returns false
+        coEvery { preferencesRepository.isAchievementNotificationEnabled() } returns true
     }
-    
-    private fun observeBleEvents() {
-        bleRepository.buttonEvents
-            .onEach { event ->
-                when (event) {
-                    is BleButtonEvent.SinglePress -> {
-                        incrementCount()
-                    }
-                    is BleButtonEvent.DoublePress -> {
-                        // Handle double press if needed
-                    }
-                    is BleButtonEvent.LongPress -> {
-                        // Handle long press if needed
-                    }
-                }
-            }
-            .launchIn(viewModelScope)
-    }
-    
-    private fun incrementCount() {
-        launch {
-            wishCountRepository.incrementCount()
-            sendEffect(HomeEffect.ShowCountAnimation)
-        }
-    }
-    
-    private fun resetCount() {
-        launch {
-            sendEffect(HomeEffect.ShowResetConfirmation)
-            wishCountRepository.resetCount(ResetReason.MANUAL)
-        }
-    }
-    
-    private fun toggleBleConnection() {
-        launch {
-            if (viewState.value.isConnected) {
-                bleRepository.disconnect()
-            } else {
-                bleRepository.connect("device_address")
-            }
-        }
-    }
-    
-    private fun refresh() {
-        updateState { copy(isRefreshing = true) }
-        launch {
-            val streak = wishCountRepository.getCurrentStreak()
-            updateState { 
-                copy(currentStreak = streak, isRefreshing = false)
-            }
-        }
-    }
-    
-    private fun loadStatistics() {
-        launch {
-            val stats = wishCountRepository.getWeeklyStatistics()
-            updateState { copy(weeklyStats = stats) }
-        }
-    }
-    
-    private fun loadRecentRecords() {
-        launch {
-            val records = wishCountRepository.getRecentRecords(7)
-            updateState { copy(recentRecords = records) }
-        }
-    }
-    
-    private fun handleGoalAchievement() {
-        launch {
-            sendEffect(HomeEffect.ShowGoalAchievement)
-            if (preferencesRepository.isAutoResetOnGoal()) {
-                wishCountRepository.resetCount(ResetReason.GOAL_ACHIEVED)
-            }
-        }
-    }
-    
-    private fun restoreState() {
-        savedStateHandle.get<Int>("todayCount")?.let { count ->
-            updateState { copy(todayCount = count) }
-        }
-        savedStateHandle.get<Int>("dailyGoal")?.let { goal ->
-            updateState { copy(dailyGoal = goal) }
-        }
-        savedStateHandle.get<Int>("currentStreak")?.let { streak ->
-            updateState { copy(currentStreak = streak) }
-        }
-        savedStateHandle.get<Boolean>("isConnected")?.let { connected ->
-            updateState { copy(isConnected = connected) }
-        }
-    }
-    
-    fun updateState(update: HomeViewState.() -> HomeViewState) {
-        val newState = viewState.value.update()
-        _viewState.value = newState
-        
-        // Save to SavedStateHandle
-        savedStateHandle.set("todayCount", newState.todayCount)
-        savedStateHandle.set("dailyGoal", newState.dailyGoal)
-        savedStateHandle.set("currentStreak", newState.currentStreak)
-        savedStateHandle.set("isConnected", newState.isConnected)
-    }
-}
-
-// Supporting classes
-data class HomeViewState(
-    val isLoading: Boolean = true,
-    val isRefreshing: Boolean = false,
-    val todayCount: Int = 0,
-    val dailyGoal: Int = 100,
-    val progress: Float = 0f,
-    val currentStreak: Int = 0,
-    val isGoalAchieved: Boolean = false,
-    val isConnected: Boolean = false,
-    val isConnecting: Boolean = false,
-    val connectedDeviceAddress: String? = null,
-    val batteryLevel: Int = 100,
-    val weeklyStats: WeeklyStatistics? = null,
-    val recentRecords: List<DailyRecord> = emptyList()
-)
-
-sealed class HomeEvent {
-    object IncrementWishCount : HomeEvent()
-    object ResetCount : HomeEvent()
-    object ToggleBleConnection : HomeEvent()
-    object Refresh : HomeEvent()
-    object LoadStatistics : HomeEvent()
-    object LoadRecentRecords : HomeEvent()
-}
-
-sealed class HomeEffect {
-    object ShowCountAnimation : HomeEffect()
-    object ShowResetConfirmation : HomeEffect()
-    object ShowGoalAchievement : HomeEffect()
-    object ShowLowBatteryWarning : HomeEffect()
-    data class ShowError(val message: String) : HomeEffect()
-}
-
-sealed class BleConnectionState {
-    object Disconnected : BleConnectionState()
-    object Connecting : BleConnectionState()
-    data class Connected(val deviceAddress: String) : BleConnectionState()
-}
-
-sealed class BleButtonEvent {
-    object SinglePress : BleButtonEvent()
-    object DoublePress : BleButtonEvent()
-    object LongPress : BleButtonEvent()
-}
-
-data class WeeklyStatistics(
-    val totalCount: Int,
-    val averageCount: Double,
-    val achievementDays: Int
-)
-
-enum class ResetReason {
-    MANUAL, MIDNIGHT, GOAL_ACHIEVED
 }

@@ -1,9 +1,12 @@
 package com.wishring.app.data.repository
 
 import com.wishring.app.core.util.DateUtils
+import com.wishring.app.core.util.Constants
 import com.wishring.app.data.local.database.dao.ResetLogDao
 import com.wishring.app.data.local.database.dao.WishCountDao
 import com.wishring.app.data.local.database.entity.ResetType
+import com.wishring.app.data.local.database.entity.WishCountEntity
+import com.wishring.app.data.local.database.entity.WishData
 import com.wishring.app.domain.model.DailyRecord
 import com.wishring.app.domain.model.ResetLog
 import com.wishring.app.domain.model.WishCount
@@ -165,10 +168,31 @@ class WishCountRepositoryImpl @Inject constructor(
     }
     
     override suspend fun incrementTodayCount(amount: Int): WishCount {
-        val today = getTodayWishCount()
-        val updated = today.incrementCount(amount)
-        wishCountDao.update(updated.toEntity())
-        return updated
+        val today = DateUtils.getTodayString()
+        val existing = wishCountDao.getByDate(today)
+        
+        if (existing != null) {
+            // Increment total count (shared across all wishes)
+            val updatedEntity = existing.incrementTotalCount(amount)
+            wishCountDao.insert(updatedEntity)
+            return WishCount.fromEntity(updatedEntity)
+        } else {
+            // Create new entity for today with initial count
+            val defaultWishText = preferencesRepository.getDefaultWishText()
+            val defaultTargetCount = preferencesRepository.getDefaultTargetCount()
+            
+            val newEntity = WishCountEntity(
+                date = today,
+                totalCount = amount,
+                wishText = defaultWishText,
+                targetCount = defaultTargetCount,
+                isCompleted = amount >= defaultTargetCount,
+                createdAt = DateUtils.getCurrentTimestamp(),
+                updatedAt = DateUtils.getCurrentTimestamp()
+            )
+            wishCountDao.insert(newEntity)
+            return WishCount.fromEntity(newEntity)
+        }
     }
     
     override suspend fun updateTodayWishAndTarget(
@@ -298,5 +322,55 @@ class WishCountRepositoryImpl @Inject constructor(
         return wishCountDao.getRecentRecords(limit).map { entities ->
             entities.map { WishCount.fromEntity(it) }
         }
+    }
+    
+    override suspend fun updateTodayWishesAndTarget(
+        wishesData: List<WishData>,
+        activeWishIndex: Int
+    ): WishCount {
+        val today = DateUtils.getTodayString()
+        val existing = wishCountDao.getByDate(today)
+        
+        val updatedEntity = if (existing != null) {
+            existing.updateWishes(wishesData, activeWishIndex.coerceIn(0, wishesData.size - 1))
+        } else {
+            // Create new entity with wishes
+            val defaultWishText = preferencesRepository.getDefaultWishText()
+            val defaultTargetCount = preferencesRepository.getDefaultTargetCount()
+            
+            com.wishring.app.data.local.database.entity.WishCountEntity.createWithWishes(
+                wishes = wishesData,
+                activeIndex = activeWishIndex.coerceIn(0, wishesData.size - 1),
+                date = today
+            )
+        }
+        
+        wishCountDao.insert(updatedEntity)
+        return WishCount.fromEntity(updatedEntity)
+    }
+    
+    override suspend fun setActiveWishIndex(index: Int): WishCount {
+        val today = DateUtils.getTodayString()
+        val existing = wishCountDao.getByDate(today) 
+            ?: throw IllegalStateException("No wish count found for today")
+        
+        val wishes = existing.parseWishes()
+        val validIndex = index.coerceIn(0, wishes.size - 1)
+        val updatedEntity = existing.updateWishes(wishes, validIndex)
+        
+        wishCountDao.insert(updatedEntity)
+        return WishCount.fromEntity(updatedEntity)
+    }
+    
+    override suspend fun getActiveWishIndex(): Int {
+        val today = DateUtils.getTodayString()
+        val existing = wishCountDao.getByDate(today)
+        return existing?.activeWishIndex ?: 0
+    }
+    
+    override suspend fun getTodayWishes(): List<WishData> {
+        val today = DateUtils.getTodayString()
+        val existing = wishCountDao.getByDate(today)
+        return existing?.parseWishes() ?: emptyList()
     }
 }

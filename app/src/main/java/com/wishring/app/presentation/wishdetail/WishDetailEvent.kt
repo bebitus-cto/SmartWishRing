@@ -3,161 +3,37 @@ package com.wishring.app.presentation.wishdetail
 import java.time.LocalDate
 
 /**
- * User events for Detail screen
- * Represents user interactions and actions
+ * Simplified Events for WishDetail screen
+ * Only essential navigation and data loading events
  */
-sealed class DetailEvent {
+sealed class WishDetailEvent {
+    /**
+     * Navigate back to previous screen
+     */
+    object NavigateBack : WishDetailEvent()
     
     /**
-     * Load initial data
-     * @param date Initial date to load
+     * Load data for specific date
      */
-    data class LoadData(val date: LocalDate = LocalDate.now()) : DetailEvent()
+    data class LoadDataForDate(val date: LocalDate) : WishDetailEvent()
     
     /**
-     * Select date
-     * @param date Date to select
+     * Navigate to previous date
      */
-    data class SelectDate(val date: LocalDate) : DetailEvent()
+    object NavigateToPreviousDate : WishDetailEvent()
     
     /**
-     * Navigate to previous month
+     * Navigate to next date
      */
-    object NavigatePreviousMonth : DetailEvent()
+    object NavigateToNextDate : WishDetailEvent()
     
     /**
-     * Navigate to next month
+     * Retry loading data when error occurs
      */
-    object NavigateNextMonth : DetailEvent()
+    object RetryLoading : WishDetailEvent()
     
     /**
-     * Navigate to today
+     * Dismiss error message
      */
-    object NavigateToToday : DetailEvent()
-    
-    /**
-     * Change view mode
-     * @param mode New view mode
-     */
-    data class ChangeViewMode(val mode: ViewMode) : DetailEvent()
-    
-    /**
-     * Show reset details
-     * @param resetLog Reset log to show details for
-     */
-    data class ShowResetDetails(val resetLog: ResetLog) : DetailEvent()
-    
-    /**
-     * Hide reset details
-     */
-    object HideResetDetails : DetailEvent()
-    
-    /**
-     * Delete reset log
-     * @param resetLogId Reset log ID to delete
-     */
-    data class DeleteResetLog(val resetLogId: Long) : DetailEvent()
-    
-    /**
-     * Edit record
-     * @param date Date of record to edit
-     */
-    data class EditRecord(val date: LocalDate) : DetailEvent()
-    
-    /**
-     * Delete record
-     * @param date Date of record to delete
-     */
-    data class DeleteRecord(val date: LocalDate) : DetailEvent()
-    
-    /**
-     * Share record
-     * @param date Date of record to share
-     */
-    data class ShareRecord(val date: LocalDate = LocalDate.now()) : DetailEvent()
-    
-    /**
-     * Export data
-     * @param startDate Start date for export
-     * @param endDate End date for export
-     * @param format Export format
-     */
-    data class ExportData(
-        val startDate: LocalDate,
-        val endDate: LocalDate,
-        val format: ExportFormat
-    ) : DetailEvent()
-    
-    /**
-     * Refresh data
-     */
-    object RefreshData : DetailEvent()
-    
-    /**
-     * Navigate back
-     */
-    object NavigateBack : DetailEvent()
-    
-    /**
-     * Show statistics details
-     */
-    object ShowStatisticsDetails : DetailEvent()
-    
-    /**
-     * Show chart options
-     */
-    object ShowChartOptions : DetailEvent()
-    
-    /**
-     * Update chart type
-     * @param chartType New chart type
-     */
-    data class UpdateChartType(val chartType: ChartType) : DetailEvent()
-    
-    /**
-     * Show date picker
-     */
-    object ShowDatePicker : DetailEvent()
-    
-    /**
-     * Filter by completion status
-     * @param showCompleted Show completed records
-     * @param showIncomplete Show incomplete records
-     */
-    data class FilterByCompletion(
-        val showCompleted: Boolean,
-        val showIncomplete: Boolean
-    ) : DetailEvent()
-    
-    /**
-     * Dismiss error
-     */
-    object DismissError : DetailEvent()
-    
-    /**
-     * Select message
-     * @param index Index of message to select
-     */
-    data class SelectMessage(val index: Int) : DetailEvent()
+    object DismissError : WishDetailEvent()
 }
-
-/**
- * Export format enum
- */
-enum class ExportFormat {
-    CSV,
-    JSON,
-    PDF,
-    IMAGE
-}
-
-/**
- * Reset log for detail view
- */
-data class ResetLog(
-    val id: Long,
-    val time: String,
-    val countLost: Int,
-    val type: String,
-    val reason: String?
-)

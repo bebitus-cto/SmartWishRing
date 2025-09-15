@@ -1,9 +1,6 @@
 package com.wishring.app.presentation.home
 
-import com.wishring.app.domain.model.AppNotification
-import com.wishring.app.domain.model.HealthDataType
-import com.wishring.app.domain.model.UnitPreferences
-import com.wishring.app.domain.model.UserProfile
+
 
 /**
  * User events for Home screen
@@ -22,16 +19,18 @@ sealed class HomeEvent {
     object RefreshData : HomeEvent()
     
     /**
-     * Increment wish count
-     * @param amount Amount to increment (default 1)
+     * Increment count
+     * @param amount Amount to increment
      */
     data class IncrementCount(val amount: Int = 1) : HomeEvent()
     
-    /**
+/**
      * Reset today's count
      * @param reason Reset reason
      */
     data class ResetCount(val reason: String? = null) : HomeEvent()
+    
+
     
     /**
      * Navigate to wish input screen
@@ -44,12 +43,9 @@ sealed class HomeEvent {
      */
     data class NavigateToDetail(val date: String) : HomeEvent()
     
-    /**
-     * Navigate to settings screen
-     */
-    object NavigateToSettings : HomeEvent()
+
     
-    /**
+/**
      * Start BLE scanning
      */
     object StartBleScanning : HomeEvent()
@@ -71,9 +67,32 @@ sealed class HomeEvent {
     object SyncWithDevice : HomeEvent()
     
     /**
-     * Share achievement
+     * Select BLE device from picker
+     * @param deviceAddress Device MAC address
+     */
+    data class SelectBleDevice(val deviceAddress: String) : HomeEvent()
+    
+    /**
+     * Dismiss BLE device picker dialog
+     */
+    object DismissBleDevicePicker : HomeEvent()
+    
+    /**
+     * Share achievement (show dialog)
      */
     object ShareAchievement : HomeEvent()
+    
+    /**
+     * Confirm share with message and hashtags
+     * @param message Share message
+     * @param hashtags Hashtags to include
+     */
+    data class ConfirmShare(val message: String, val hashtags: String) : HomeEvent()
+    
+    /**
+     * Dismiss share dialog
+     */
+    object DismissShareDialog : HomeEvent()
     
     /**
      * Show streak details
@@ -117,65 +136,39 @@ sealed class HomeEvent {
      */
     object RequestBlePermission : HomeEvent()
     
-    // ===== MRD SDK 건강 데이터 이벤트들 =====
+    /**
+     * Enable Bluetooth (prompt user to enable)
+     */
+    object EnableBluetooth : HomeEvent()
     
     /**
-     * Load health data from device
+     * Dismiss permission explanation dialog
      */
-    object LoadHealthData : HomeEvent()
+    object DismissPermissionExplanation : HomeEvent()
     
     /**
-     * Start real-time heart rate monitoring
+     * Request permissions from explanation dialog
      */
-    object StartRealTimeHeartRate : HomeEvent()
+    object RequestPermissionsFromExplanation : HomeEvent()
     
     /**
-     * Stop real-time heart rate monitoring
+     * Dismiss permission denied dialog
      */
-    object StopRealTimeHeartRate : HomeEvent()
+    object DismissPermissionDenied : HomeEvent()
+    
     
     /**
-     * Start real-time ECG monitoring
+     * Toggle debug panel visibility
      */
-    object StartRealTimeEcg : HomeEvent()
+    object ToggleDebugPanel : HomeEvent()
     
     /**
-     * Stop real-time ECG monitoring
+     * Clear debug event history
      */
-    object StopRealTimeEcg : HomeEvent()
-    
+    object ClearDebugHistory : HomeEvent()
     /**
-     * Update user profile
-     * @param userProfile User profile data
+     * Open app settings from permission denied dialog
      */
-    data class UpdateUserProfile(val userProfile: UserProfile) : HomeEvent()
-    
-    /**
-     * Set sport target
-     * @param steps Daily step goal
-     */
-    data class SetSportTarget(val steps: Int) : HomeEvent()
-    
-    /**
-     * Send app notification to device
-     * @param notification Notification data
-     */
-    data class SendAppNotification(val notification: AppNotification) : HomeEvent()
-    
-    /**
-     * Update device settings
-     * @param units Unit preferences
-     */
-    data class UpdateDeviceSettings(val units: UnitPreferences) : HomeEvent()
-    
-    /**
-     * Find device (make device vibrate/beep)
-     */
-    object FindDevice : HomeEvent()
-    
-    /**
-     * Show health data details
-     * @param type Type of health data to show
-     */
-    data class ShowHealthDetails(val type: HealthDataType) : HomeEvent()
+    object OpenAppSettingsFromDialog : HomeEvent()
+
 }

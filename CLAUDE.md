@@ -13,225 +13,227 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **WISH RING** - Android app for a smart ring device that tracks and motivates users to achieve their wishes through button press counting.
 
-## Quick Reference
+## Architecture & Technology Stack
 
 ### Clean Architecture + MVVM Pattern
-- **Presentation Layer**: Jetpack Compose UI + ViewModels (MVI pattern for state management)
-- **Domain Layer**: Use cases, repository interfaces, business models
-- **Data Layer**: Repository implementations, local database (Room), DataStore preferences, BLE communication
+- **Presentation Layer**: Jetpack Compose UI + ViewModels with MVI pattern
+  - Features: `home`, `settings`, `wishinput`, `wishdetail`, `splash`
+  - Shared: `navigation`, `component`, `effect`, `event`, `viewmodel`
+- **Domain Layer**: Repository interfaces, business models, use cases
+- **Data Layer**: Repository implementations, Room database, DataStore preferences
+- **BLE Layer**: MRD SDK integration, connection management, device validation
+- **Core Layer**: Base classes, utilities, constants
 
 ### Core Technologies
-- **UI**: Jetpack Compose with Material3
-- **DI**: Hilt/Dagger
-- **Database**: Room with Flow support
-- **Async**: Coroutines + StateFlow/SharedFlow
-- **BLE**: Nordic BLE library + MRD SDK (AAR in libs/)
-- **Navigation**: Navigation Compose
+- **UI**: Jetpack Compose with Material3 design system
+- **DI**: Hilt/Dagger with modular structure (AppModule, BleModule, RepositoryModule)
+- **Database**: Room with Flow-based reactive data access
+- **Async**: Coroutines + StateFlow/SharedFlow for reactive programming
+- **BLE**: Nordic BLE library + MRD SDK (AAR: `app/libs/sdk_mrd20240218_1.1.5.aar`)
+- **Navigation**: Navigation Compose with type-safe routing
+- **State Management**: MVI pattern with immutable ViewState, Event, Effect
+
+## Project Structure
+
+### Package Organization: `com.wishring.app`
+
+```
+app/src/main/java/com/wishring/app/
+├── WishRingApplication.kt          # Hilt entry point, MRD SDK initialization
+├── MainActivity.kt                 # Compose activity, navigation host
+├── ui/theme/                       # Material3 theme system
+├── di/                            # Hilt modules (App, Ble, Repository)
+├── core/                          # Base classes, utilities, constants
+├── ble/                           # 🔥 Main BLE implementation
+├── data/                          # Data layer + BLE models
+├── domain/                        # Domain interfaces & models
+└── presentation/                  # All UI features & components
+```
+
+### BLE Architecture (Critical)
+
+**🔥 IMPORTANT**: BLE implementation has two locations:
+
+1. **Active Implementation**: `/ble/` (Used by DI system)
+   - `BleRepositoryImpl.kt` - Main BLE repository
+   - `MrdProtocolAdapter.kt` - **ACTIVE** MRD SDK adapter  
+   - `BleConnectionManager.kt` - Connection handling
+   - `BleAutoConnectService.kt` - Background auto-connect
+   - `WishRingDeviceValidator.kt` - Device validation
+   - `BleConstants.kt` - BLE UUIDs
+
+2. **Data Models**: `/data/ble/model/` 
+   - `BleConnectionState.kt` - Connection state enum
+   - `BleConstants.kt` - Additional constants
+   - ⚠️ `/data/ble/MrdProtocolAdapter.kt` - **UNUSED DUPLICATE**
 
 ## Development Guidelines
 
 ### File Navigation
-Always check `docs/Index.md` first to quickly locate specific files and understand their purposes.
-
-### Architecture Understanding
-Refer to `docs/Architecture.md` for:
-- Data flow patterns (UDF/MVI)
-- Layer interactions and dependencies
-- State management strategies
-- BLE communication architecture
-- Error handling patterns
+- **Start with**: `docs/Index.md` for file locations and purposes
+- **Architecture**: `docs/Architecture.md` for patterns and data flow
+- **BLE Work**: Focus on `/ble/` directory (main implementation)
+- **UI Features**: `/presentation/{feature}/` for complete feature modules
 
 ### Key Patterns
 
-#### State Management (MVI)
+#### MVI State Management
 ```kotlin
-ViewState → immutable UI state
-Event → user actions
-Effect → one-time side effects
+// Every feature follows this pattern:
+{Feature}ViewState    → Immutable UI state
+{Feature}Event        → User actions/intentions  
+{Feature}Effect       → One-time side effects
+{Feature}ViewModel    → State management logic
+{Feature}Screen       → Compose UI entry point
 ```
 
 #### Repository Pattern
-All data operations go through repository interfaces in the domain layer, with implementations in the data layer.
+- **Interfaces**: `domain/repository/{Name}Repository.kt`
+- **Implementations**: `data/repository/{Name}RepositoryImpl.kt`
+- **DI Binding**: `di/RepositoryModule.kt`
 
-#### BLE Communication
-- Interface: `domain/repository/BleRepository.kt`
-- Implementation: `ble/BleRepositoryImpl.kt`
-- Protocol Adapter: `ble/MrdProtocolAdapter.kt`
-
-### Testing Strategy
-- Unit tests for ViewModels and Use Cases
-- Integration tests for Repositories
-- Instrumented tests for Database and BLE
+#### Feature Organization
+Each presentation feature has consistent structure:
+```
+presentation/{feature}/
+├── {Feature}Screen.kt          # Main Compose screen
+├── {Feature}ViewModel.kt       # Business logic
+├── {Feature}ViewState.kt       # UI state model
+├── {Feature}Event.kt           # User events
+├── {Feature}Effect.kt          # Side effects
+└── component/                  # Feature-specific components
+```
 
 ## 🔴 CRITICAL: Test Synchronization Rules
 
 **⚠️ MANDATORY: All code changes MUST include corresponding test updates**
 
-### Absolute Requirements (MUST)
+### Absolute Requirements
 
-1. **Test-Code Synchronization**
-   ```
-   When modifying: HomeViewModel.kt
-   MUST also update: HomeViewModelTest.kt
-   ```
-   - Every production code change MUST have matching test changes
-   - New features MUST be committed WITH their tests
-   - Deleted code MUST have corresponding test removals
+1. **Test-Code Synchronization**: Every production code change requires matching test updates
+2. **Coverage Maintenance**: Minimum 85% coverage, critical paths (BLE, persistence) need 95%+
+3. **Test-First Bug Fixes**: Write failing test first, then fix code
 
-2. **Test-First for Bug Fixes**
-   ```kotlin
-   // Step 1: Write failing test that reproduces the bug
-   @Test
-   fun `should handle edge case properly`() {
-       // This test MUST fail before fix
-   }
-   
-   // Step 2: Fix the actual code
-   // Step 3: Verify test now passes
-   ```
+### Test Structure (Comprehensive)
 
-3. **Coverage Requirements**
-   - New code MUST maintain or increase coverage (minimum 85%)
-   - Modified code MUST NOT decrease existing coverage
-   - Critical paths (BLE, Data persistence) MUST have 95%+ coverage
+```
+app/src/test/java/com/wishring/app/
+├── core/                   # Core utility tests
+├── ble/                    # BLE implementation tests  
+├── data/repository/        # Repository implementation tests
+├── domain/                 # Domain model & use case tests
+├── presentation/viewmodel/ # ViewModel unit tests
+├── property/               # Property-based testing
+├── integration/            # End-to-end integration tests
+├── concurrency/            # Threading & race condition tests
+└── performance/            # Performance & large dataset tests
+```
 
 ### File Mapping Rules
 
-| If you modify... | You MUST update... | Test type required |
-|------------------|-------------------|-------------------|
+| Production File | Required Test | Test Type |
+|----------------|---------------|-----------|
 | `*ViewModel.kt` | `*ViewModelTest.kt` | Unit + Integration |
-| `*Repository.kt` | `*RepositoryTest.kt` | Unit + Integration |
+| `*RepositoryImpl.kt` | `*RepositoryImplTest.kt` | Unit + Integration |
 | `*Screen.kt` | `*ScreenTest.kt` | Compose UI Test |
-| `*UseCase.kt` | `*UseCaseTest.kt` | Unit Test |
-| Domain models | Property-based tests | Property + Unit |
-| BLE components | Mock + Integration | Mock framework |
+| BLE components | Mock + Integration | BLE simulation |
+| Domain models | Property-based | Property testing |
 
-### Automated Enforcement
+### Pre-commit Enforcement
 
 ```bash
-# Pre-commit hook (MUST be installed)
-#!/bin/bash
-# .git/hooks/pre-commit
-
-# Check if source files changed
-CHANGED_SRC=$(git diff --cached --name-only | grep -E '\.kt$' | grep -v Test)
-
-# For each changed source file, verify test exists
-for file in $CHANGED_SRC; do
-    TEST_FILE="${file//.kt/Test.kt}"
-    if ! git diff --cached --name-only | grep -q "$TEST_FILE"; then
-        echo "❌ ERROR: Changed $file but no corresponding test update"
-        exit 1
-    fi
-done
-
-# Run tests before commit
+# .git/hooks/pre-commit (MUST be installed)
+./scripts/check-test-sync.sh || exit 1
 ./gradlew test || exit 1
 ```
 
 ### Commit Message Convention
 
 ```
-feat: Add wish count animation
+feat(home): Add wish count animation
 
-- Added animation to WishCountCard component
+- Added animation to WishCountCard component  
 - Updated WishCountCardTest with animation verification
-- Added UI test for animation timing
+- Added UI test for animation timing and performance
 
 Test: WishCountCardTest, WishCountAnimationTest
 Coverage: 92% (+2%)
 ```
 
-### Test Update Examples
+## Development Workflow
 
-#### Example 1: Adding a new method
+### 1. Understanding Existing Code
+```bash
+# Check file purpose and location
+cat docs/Index.md | grep -i "filename"
+
+# Understand feature architecture  
+ls app/src/main/java/com/wishring/app/presentation/{feature}/
+
+# Check existing tests
+ls app/src/test/java/com/wishring/app/**/*Test.kt
+```
+
+### 2. Making Changes
+
+**For BLE Work:**
 ```kotlin
-// BEFORE: HomeViewModel.kt
-class HomeViewModel {
-   fun incrementCount() { /* ... */ }
-}
+// Work in main BLE implementation
+app/src/main/java/com/wishring/app/ble/
 
-// AFTER: HomeViewModel.kt
-class HomeViewModel {
-   fun incrementCount() { /* ... */ }
-
-   fun resetCount() {  // NEW METHOD
-      _uiState.update { it.copy(count = 0) }
-   }
-}
-
-// MUST ADD: HomeViewModelTest.kt
-@Test
-fun `resetCount should set count to zero`() {
-   // Given
-   viewModel.incrementCount()
-   assertEquals(1, viewModel.uiState.value.count)
-
-   // When
-   viewModel.resetCount()
-
-   // Then
-   assertEquals(0, viewModel.uiState.value.count)
-}
+// Test with:
+app/src/test/java/com/wishring/app/ble/
 ```
 
-#### Example 2: Modifying existing logic
+**For UI Features:**
 ```kotlin
-// If you change the increment logic
-fun incrementCount() {
-   // OLD: count++
-   // NEW: count += 2
-}
+// Complete feature in presentation layer
+app/src/main/java/com/wishring/app/presentation/{feature}/
 
-// MUST UPDATE the test expectation
-@Test
-fun `incrementCount should increase by 2`() {  // Updated test name
-   viewModel.incrementCount()
-   assertEquals(2, viewModel.uiState.value.count)  // Updated assertion
-}
+// Test with:
+app/src/test/java/com/wishring/app/presentation/viewmodel/{Feature}ViewModelTest.kt
 ```
 
-### CI/CD Integration
+### 3. Testing Requirements
 
-```yaml
-# .github/workflows/test-sync.yml
-name: Test Synchronization Check
+**Before any commit:**
+```bash
+# Run all tests  
+./gradlew test
 
-on: [pull_request]
+# Check coverage
+./gradlew jacocoTestReport
 
-jobs:
-   check-test-sync:
-      runs-on: ubuntu-latest
-      steps:
-         - name: Check test coverage
-           run: |
-              ./gradlew jacocoTestReport
-              if [ $(cat build/reports/jacoco/coverage.txt) -lt 85 ]; then
-                echo "❌ Coverage below 85%"
-                exit 1
-              fi
-
-         - name: Verify test updates
-           run: |
-              # Check that modified source files have corresponding test updates
-              ./scripts/check-test-sync.sh
+# Ensure BLE integration works
+./gradlew connectedAndroidTest
 ```
-
-### Exceptions (Require Explicit Justification)
-
-Only the following are exempt from test requirements:
-1. Pure UI layout changes (must be noted in PR)
-2. Configuration files (unless they affect behavior)
-3. Generated code (must be marked with @Generated)
-
-**⚠️ WARNING**: Commits without proper test synchronization will be:
-1. Automatically rejected by pre-commit hooks
-2. Blocked in PR reviews
-3. Reverted if accidentally merged
 
 ## Important Notes
 
-- The app uses Android SDK 26-34 (minimum SDK 26 for BLE stability)
-- MRD SDK is included as AAR file in `app/libs/` directory
-- All business logic is in the Domain layer (framework-independent)
-- UI state is managed through immutable data classes and StateFlow
+- **MRD SDK**: Located at `app/libs/sdk_mrd20240218_1.1.5.aar`
+- **Android SDK**: 26-34 (minimum 26 for BLE stability)
+- **Architecture**: Framework-independent business logic in Domain layer
+- **State Management**: Immutable ViewState with StateFlow
+- **BLE Focus**: Main implementation in `/ble/`, avoid `/data/ble/MrdProtocolAdapter.kt` (duplicate)
+- **Testing**: Comprehensive test coverage including property-based and concurrency testing
+
+## Quick Reference Commands
+
+```bash
+# Build and test
+./gradlew clean build test
+
+# Run specific test suite
+./gradlew test --tests "*BleRepositoryImplTest*"
+
+# Check lint and compile
+./gradlew lintDebug compileDebugKotlin
+
+# Install debug APK  
+./gradlew installDebug
+```
+
+---
+
+**Last Updated**: 2025-01-13  
+**For Questions**: Check `docs/Index.md` for file locations, `docs/Architecture.md` for patterns

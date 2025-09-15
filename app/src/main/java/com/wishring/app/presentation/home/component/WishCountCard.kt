@@ -112,7 +112,7 @@ fun WishCountDisplay(
         CircularGauge(
             currentCount = currentCount,
             targetCount = targetCount,
-            modifier = Modifier.size(ProgressIndicatorSize)
+            modifier = Modifier.size(200.dp)
         )
         
         Spacer(modifier = Modifier.height(16.dp))
@@ -122,29 +122,6 @@ fun WishCountDisplay(
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
-        )
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun WishCountCardPreview() {
-    WishRingTheme {
-        WishCountCard(
-            currentCount = 700,
-            targetCount = 1000,
-            wishText = "나는 매일 성장하고 있다"
-        )
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun WishCountDisplayPreview() {
-    WishRingTheme {
-        WishCountDisplay(
-            currentCount = 700,
-            targetCount = 1000
         )
     }
 }

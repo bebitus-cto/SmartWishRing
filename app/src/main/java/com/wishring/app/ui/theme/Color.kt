@@ -2,8 +2,6 @@ package com.wishring.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// ===== Figma에서 추출한 WISH Ring 색상 =====
-
 // Primary Colors
 val Purple_Primary = Color(0xFFA613FE)  // 메인 보라색 (#A613FE from Figma)
 val Purple_Light = Color(0xFFE4B5FF)    // 연한 보라색
@@ -18,13 +16,13 @@ val Background_Card = Color(0xFFFAFAFA)     // 카드 배경
 // Text Colors
 val Text_Primary = Color(0xFF333333)    // 주요 텍스트 (#333333 from Figma)
 val Text_Secondary = Color(0xFF666666)  // 보조 텍스트
+val Gray_Light = Color(0xFFE0E0E0)      // 연한 회색 (UI 배경, 구분선 등)
 val Text_OnPrimary = Color(0xFFFFFFFF)  // 보라색 배경 위 텍스트
 val Text_Disabled = Color(0xFFC0C0C0)   // 비활성 텍스트
 val Text_Tertiary = Color(0xFF9E9E9E)   // 3차 텍스트
 
 // Surface Colors
 val Surface_Card = Color(0xFFFFFFFF)
-val Surface_Overlay = Color(0x33FFFFFF)  // 20% 흰색 오버레이
 val Surface_Shadow = Color(0x1A000000)   // 10% 검정 그림자
 
 // Border & Divider

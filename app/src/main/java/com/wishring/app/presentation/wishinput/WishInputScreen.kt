@@ -3,6 +3,8 @@ package com.wishring.app.presentation.wishinput
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -82,7 +84,7 @@ fun WishInputScreen(
 }
 
 @Composable
-private fun WishInputContent(
+internal fun WishInputContent(
     viewState: WishInputViewState,
     onEvent: (WishInputEvent) -> Unit,
     modifier: Modifier = Modifier
@@ -110,16 +112,48 @@ private fun WishInputContent(
                 .padding(horizontal = 17.dp, vertical = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Section title
-            Text(
-                text = "오늘의 소원을 등록하세요 (최대 3개)",
-                style = MaterialTheme.typography.headlineSmall.copy(
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold
-                ),
-                color = Text_Primary,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
+            // Section title with suggestions toggle
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "오늘의 소원을 등록하세요 (최대 3개)",
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold
+                    ),
+                    color = Text_Primary,
+                    modifier = Modifier.weight(1f)
+                )
+                
+                // Suggestions toggle button
+                TextButton(
+                    onClick = { onEvent(WishInputEvent.ToggleSuggestions) },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = Purple_Medium
+                    )
+                ) {
+                    Text(
+                        text = if (viewState.showSuggestions) "숨기기" else "추천",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    )
+                }
+            }
+            
+            // Suggested wishes section
+            if (viewState.showSuggestions) {
+                WishSuggestionsSection(
+                    suggestions = viewState.suggestedWishes,
+                    onSuggestionClick = { suggestion ->
+                        onEvent(WishInputEvent.SelectSuggestedWish(suggestion))
+                    }
+                )
+            }
             
             // Multiple wish cards
             viewState.wishes.forEachIndexed { index, wish ->
@@ -193,42 +227,82 @@ private fun WishInputContent(
                 }
             }
             
+            // Progress indicator
+            WishProgressIndicator(
+                validWishCount = viewState.validWishCount,
+                maxWishCount = viewState.maxWishCount
+            )
+            
             Spacer(modifier = Modifier.weight(1f))
             
-            // Save button
-            Button(
-                onClick = { onEvent(WishInputEvent.SaveWish) },
-                enabled = viewState.isSaveEnabled,
+            // Action buttons row
+            Row(
                 modifier = Modifier
-                    .align(Alignment.CenterHorizontally)
-                    .width(160.dp)
-                    .height(40.dp),
-                shape = RoundedCornerShape(25.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Purple_Medium,
-                    disabledContainerColor = Color(0xFFCCCCCC)
-                ),
-                elevation = ButtonDefaults.buttonElevation(
-                    defaultElevation = 3.dp
-                )
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)
             ) {
-                if (viewState.isSaving) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        color = Color.White,
-                        strokeWidth = 2.dp
+                // Clear button (only show if there are wishes with text)
+                if (viewState.wishes.any { it.text.isNotEmpty() }) {
+                    OutlinedButton(
+                        onClick = { onEvent(WishInputEvent.ClearWishText) },
+                        modifier = Modifier.width(100.dp),
+                        shape = RoundedCornerShape(25.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = Color(0xFF666666)
+                        )
+                    ) {
+                        Text(
+                            text = "초기화",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        )
+                    }
+                }
+                
+                // Save button
+                Button(
+                    onClick = { onEvent(WishInputEvent.SaveWish) },
+                    enabled = viewState.isSaveEnabled,
+                    modifier = Modifier.width(160.dp).height(40.dp),
+                    shape = RoundedCornerShape(25.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Purple_Medium,
+                        disabledContainerColor = Color(0xFFCCCCCC)
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(
+                        defaultElevation = 3.dp
                     )
-                } else {
-                    Text(
-                        text = "소원 등록하기",
-                        style = MaterialTheme.typography.labelLarge.copy(
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold
-                        ),
-                        color = Color.White
-                    )
+                ) {
+                    if (viewState.isSaving) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text(
+                            text = if (viewState.isEditMode) "소원 수정하기" else "소원 등록하기",
+                            style = MaterialTheme.typography.labelLarge.copy(
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = Color.White
+                        )
+                    }
                 }
             }
+        }
+        
+        // Error handling
+        if (viewState.error != null) {
+            ErrorSnackbar(
+                message = viewState.error,
+                onDismiss = { onEvent(WishInputEvent.DismissError) },
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
         }
     }
 }
@@ -277,256 +351,162 @@ private fun WishInputTopBar(
     }
 }
 
-@Preview(showBackground = true, device = "id:pixel_5", name = "Single Wish")
 @Composable
-fun WishInputScreenSinglePreview() {
-    WishRingTheme {
-        val previewState = WishInputViewState(
-            wishes = listOf(
-                com.wishring.app.presentation.wishinput.model.WishItem.create(
-                    text = "나는 매일 성장하고 있다",
-                    targetCount = 1000
-                )
-            ),
-            isLoading = false
-        )
-        
-        WishInputContent(
-            viewState = previewState,
-            onEvent = {}
-        )
-    }
-}
-
-@Preview(showBackground = true, device = "id:pixel_5", name = "Multiple Wishes")
-@Composable
-fun WishInputScreenMultiplePreview() {
-    WishRingTheme {
-        val previewState = WishInputViewState(
-            wishes = listOf(
-                com.wishring.app.presentation.wishinput.model.WishItem.create(
-                    text = "나는 매일 성장하고 있다",
-                    targetCount = 1000
+private fun WishSuggestionsSection(
+    suggestions: List<String>,
+    onSuggestionClick: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFFF8F9FF)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Text(
+                text = "💡 추천 소원",
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold
                 ),
-                com.wishring.app.presentation.wishinput.model.WishItem.create(
-                    text = "건강한 습관을 만들어간다",
-                    targetCount = 2000
-                ),
-                com.wishring.app.presentation.wishinput.model.WishItem.createEmpty()
-            ),
-            isLoading = false
-        )
-        
-        WishInputContent(
-            viewState = previewState,
-            onEvent = {}
-        )
-    }
-}
-
-@Preview(showBackground = true, device = "id:pixel_5", name = "Max Wishes Reached")
-@Composable
-fun WishInputScreenMaxPreview() {
-    WishRingTheme {
-        val previewState = WishInputViewState(
-            wishes = listOf(
-                com.wishring.app.presentation.wishinput.model.WishItem.create(
-                    text = "나는 매일 성장하고 있다",
-                    targetCount = 1000
-                ),
-                com.wishring.app.presentation.wishinput.model.WishItem.create(
-                    text = "건강한 습관을 만들어간다",
-                    targetCount = 2000
-                ),
-                com.wishring.app.presentation.wishinput.model.WishItem.create(
-                    text = "감사하는 마음을 가진다",
-                    targetCount = 1500
-                )
-            ),
-            isLoading = false
-        )
-        
-        WishInputContent(
-            viewState = previewState,
-            onEvent = {}
-        )
-    }
-}
-
-@Preview(showBackground = true, device = "id:pixel_5", name = "Empty Initial")
-@Composable
-fun WishInputScreenEmptyPreview() {
-    WishRingTheme {
-        val previewState = WishInputViewState(
-            wishes = listOf(
-                com.wishring.app.presentation.wishinput.model.WishItem.createEmpty()
-            ),
-            isLoading = false
-        )
-        
-        WishInputContent(
-            viewState = previewState,
-            onEvent = {}
-        )
-    }
-}
-
-@Preview(showBackground = true, device = "id:pixel_5", name = "Saving State")
-@Composable
-fun WishInputScreenSavingPreview() {
-    WishRingTheme {
-        val previewState = WishInputViewState(
-            wishes = listOf(
-                com.wishring.app.presentation.wishinput.model.WishItem.create(
-                    text = "저장 중인 소원",
-                    targetCount = 1000
-                )
-            ),
-            isSaving = true,
-            isLoading = false
-        )
-        
-        WishInputContent(
-            viewState = previewState,
-            onEvent = {}
-        )
-    }
-}
-
-@Preview(showBackground = true, device = "id:pixel_5", name = "Error State")
-@Composable
-fun WishInputScreenErrorPreview() {
-    WishRingTheme {
-        val previewState = WishInputViewState(
-            wishes = listOf(
-                com.wishring.app.presentation.wishinput.model.WishItem.create(
-                    text = "문제가 있는 소원",
-                    targetCount = 1000
-                )
-            ),
-            error = "위시 저장에 실패했습니다",
-            isSaving = false
-        )
-        
-        WishInputContent(
-            viewState = previewState,
-            onEvent = {}
-        )
-    }
-}
-
-@Preview(showBackground = true, device = "id:pixel_5", name = "Edit Mode")
-@Composable
-fun WishInputScreenEditModePreview() {
-    WishRingTheme {
-        val previewState = WishInputViewState(
-            wishes = listOf(
-                com.wishring.app.presentation.wishinput.model.WishItem.create(
-                    text = "수정 중인 기존 소원",
-                    targetCount = 2000
-                )
-            ),
-            isEditMode = true,
-            existingRecord = true
-        )
-        
-        WishInputContent(
-            viewState = previewState,
-            onEvent = {}
-        )
-    }
-}
-
-@Preview(showBackground = true, device = "id:pixel_5", name = "Delete Confirmation")
-@Composable
-fun WishInputScreenDeleteConfirmationPreview() {
-    WishRingTheme {
-        val previewState = WishInputViewState(
-            wishes = listOf(
-                com.wishring.app.presentation.wishinput.model.WishItem.create(
-                    text = "삭제할 소원",
-                    targetCount = 1500
-                )
-            ),
-            isEditMode = true,
-            existingRecord = true,
-            showDeleteConfirmation = true
-        )
-        
-        WishInputContent(
-            viewState = previewState,
-            onEvent = {}
-        )
-    }
-}
-
-@Preview(showBackground = true, device = "id:pixel_5", name = "Two Wishes Partial")
-@Composable
-fun WishInputScreenTwoWishesPartialPreview() {
-    WishRingTheme {
-        val previewState = WishInputViewState(
-            wishes = listOf(
-                com.wishring.app.presentation.wishinput.model.WishItem.create(
-                    text = "첫 번째 소원",
-                    targetCount = 1000
-                ),
-                com.wishring.app.presentation.wishinput.model.WishItem.createEmpty()
-            ),
-            isLoading = false
-        )
-        
-        WishInputContent(
-            viewState = previewState,
-            onEvent = {}
-        )
-    }
-}
-
-@Preview(showBackground = true, device = "id:pixel_5", name = "Long Text")
-@Composable
-fun WishInputScreenLongTextPreview() {
-    WishRingTheme {
-        val previewState = WishInputViewState(
-            wishes = listOf(
-                com.wishring.app.presentation.wishinput.model.WishItem.create(
-                    text = "매우 긴 소원 텍스트입니다. 이것은 한 줄에 다 들어가지 않을 정도로 길고 복잡한 내용을 담고 있어서 텍스트 오버플로우나 줄바꿈 처리를 테스트하기 위한 예시입니다",
-                    targetCount = 1000
-                )
+                color = Purple_Medium,
+                modifier = Modifier.padding(bottom = 12.dp)
             )
-        )
-        
-        WishInputContent(
-            viewState = previewState,
-            onEvent = {}
+            
+            suggestions.forEach { suggestion ->
+                SuggestionChip(
+                    text = suggestion,
+                    onClick = { onSuggestionClick(suggestion) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 2.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SuggestionChip(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier
+            .clickable { onClick() },
+        shape = RoundedCornerShape(8.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, Color(0xFFE0E0E0))
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall.copy(
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Normal
+            ),
+            color = Color(0xFF333333),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
         )
     }
 }
 
-@Preview(showBackground = true, device = "id:pixel_5", name = "High Target Values")
 @Composable
-fun WishInputScreenHighTargetPreview() {
-    WishRingTheme {
-        val previewState = WishInputViewState(
-            wishes = listOf(
-                com.wishring.app.presentation.wishinput.model.WishItem.create(
-                    text = "높은 목표의 첫 번째 위시",
-                    targetCount = 5000
-                ),
-                com.wishring.app.presentation.wishinput.model.WishItem.create(
-                    text = "높은 목표의 두 번째 위시",
-                    targetCount = 8000
-                ),
-                com.wishring.app.presentation.wishinput.model.WishItem.create(
-                    text = "최고 목표의 세 번째 위시",
-                    targetCount = 10000
-                )
-            ),
-            isLoading = false
-        )
+private fun WishProgressIndicator(
+    validWishCount: Int,
+    maxWishCount: Int,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        repeat(maxWishCount) { index ->
+            val isCompleted = index < validWishCount
+            
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .background(
+                        color = if (isCompleted) Purple_Medium else Color(0xFFE0E0E0),
+                        shape = androidx.compose.foundation.shape.CircleShape
+                    )
+            )
+            
+            if (index < maxWishCount - 1) {
+                Spacer(modifier = Modifier.width(8.dp))
+            }
+        }
         
-        WishInputContent(
-            viewState = previewState,
-            onEvent = {}
+        Spacer(modifier = Modifier.width(12.dp))
+        
+        Text(
+            text = "$validWishCount/$maxWishCount 완성",
+            style = MaterialTheme.typography.bodySmall.copy(
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium
+            ),
+            color = if (validWishCount > 0) Purple_Medium else Color(0xFF999999)
         )
     }
 }
+
+@Composable
+private fun ErrorSnackbar(
+    message: String,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFFFFEBEE)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall.copy(
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium
+                ),
+                color = Color(0xFFC62828),
+                modifier = Modifier.weight(1f)
+            )
+            
+            TextButton(
+                onClick = onDismiss,
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = Color(0xFFC62828)
+                )
+            ) {
+                Text(
+                    text = "닫기",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                )
+            }
+        }
+    }
+}
+

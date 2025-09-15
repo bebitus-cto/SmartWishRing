@@ -98,17 +98,7 @@ interface PreferencesRepository {
      */
     suspend fun setAchievementNotificationEnabled(enabled: Boolean)
     
-    /**
-     * Get vibration enabled status
-     * @return True if vibration enabled
-     */
-    suspend fun isVibrationEnabled(): Boolean
-    
-    /**
-     * Set vibration enabled status
-     * @param enabled True to enable vibration
-     */
-    suspend fun setVibrationEnabled(enabled: Boolean)
+
     
     /**
      * Get sound enabled status

@@ -1,6 +1,6 @@
 package com.wishring.app.domain.repository
 
-import com.wishring.app.data.ble.model.BleConnectionState
+import com.wishring.app.domain.repository.BleConnectionState
 import com.wishring.app.domain.model.DailyRecord
 import com.wishring.app.domain.model.ResetLog
 import com.wishring.app.domain.model.WishCount

@@ -99,16 +99,13 @@ class WishRingDeviceValidator @Inject constructor(
     }
     
     /**
-     * 1단계: 기기명 검증
-     * WISH RING 관련 접두사를 가지고 있는지 확인
+     * 1단계: 기기명 검증 (제거됨)
+     * 기기명 필터링 제거 - MRD SDK 통신으로만 검증
      */
     private fun validateDeviceName(deviceName: String?): Boolean {
-        if (deviceName.isNullOrBlank()) {
-            Log.w(TAG, "Device name is null or blank")
-            return false
-        }
-        
-        return BleConstants.isWishRingDeviceName(deviceName)
+        // 기기명 필터링 제거: WISH_RING은 존재하지 않는 가짜 이름
+        // 모든 BLE 기기를 허용하고 MRD SDK 통신으로 검증
+        return true
     }
     
     /**
@@ -142,20 +139,19 @@ class WishRingDeviceValidator @Inject constructor(
         
         return withTimeoutOrNull(BleConstants.SDK_VALIDATION_TIMEOUT_MS) {
             try {
-                // MRD SDK를 통한 시스템 정보 요청
-                val systemInfo = mrdProtocolAdapter.getSystemInfo(SystemInfoType.BATTERY)
+                // Battery level request to validate SDK communication
+                mrdProtocolAdapter.requestBatteryLevel()
                 
-                if (systemInfo != null) {
+                // Get battery level through repository
+                val batteryLevel = bleRepository.getBatteryLevel()
+                
+                if (batteryLevel != null) {
                     Log.d(TAG, "SDK communication successful")
-                    
-                    // 추가 정보 수집
-                    val batteryLevel = bleRepository.getBatteryLevel()
-                    val firmwareVersion = bleRepository.getFirmwareVersion()
                     
                     SdkValidationResult(
                         success = true,
                         batteryLevel = batteryLevel,
-                        firmwareVersion = firmwareVersion
+                        firmwareVersion = "Unknown" // Firmware version no longer available
                     )
                 } else {
                     Log.w(TAG, "SDK communication returned null")
@@ -211,15 +207,13 @@ class WishRingDeviceValidator @Inject constructor(
         return withContext(ioDispatcher) {
             try {
                 val batteryLevel = bleRepository.getBatteryLevel()
-                    val firmwareVersion = bleRepository.getFirmwareVersion()
-                val systemInfo = mrdProtocolAdapter.getSystemInfo(SystemInfoType.MANUFACTURER)
                 
                 DeviceDetailInfo(
                     deviceName = device.name ?: "Unknown",
                     deviceAddress = device.address,
                     batteryLevel = batteryLevel,
-                    firmwareVersion = firmwareVersion,
-                    systemInfo = systemInfo,
+                    firmwareVersion = "Unknown",
+                    systemInfo = null,
                     bondState = device.bondState,
                     rssi = null // RSSI는 스캔 시점에서만 가져올 수 있음
                 )

@@ -190,24 +190,3 @@ fun CircularGauge(
         )
     }
 }
-
-@Preview(showBackground = true)
-@Composable
-fun CircularGaugePreview() {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        modifier = Modifier.padding(16.dp)
-    ) {
-        // Incomplete state
-        CircularGauge(
-            currentCount = 700,
-            targetCount = 1000
-        )
-        
-        // Complete state
-        CircularGauge(
-            currentCount = 1000,
-            targetCount = 1000
-        )
-    }
-}

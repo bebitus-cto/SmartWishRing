@@ -42,7 +42,7 @@ class PreferencesRepositoryImpl @Inject constructor(
         val NOTIFICATION_ENABLED = booleanPreferencesKey("notification_enabled")
         val DAILY_REMINDER_TIME = stringPreferencesKey("daily_reminder_time")
         val ACHIEVEMENT_NOTIFICATION = booleanPreferencesKey("achievement_notification")
-        val VIBRATION_ENABLED = booleanPreferencesKey("vibration_enabled")
+
         val SOUND_ENABLED = booleanPreferencesKey("sound_enabled")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val LANGUAGE = stringPreferencesKey("language")
@@ -225,26 +225,7 @@ class PreferencesRepositoryImpl @Inject constructor(
         }
     }
     
-    override suspend fun isVibrationEnabled(): Boolean {
-        return dataStore.data
-            .catch { exception ->
-                if (exception is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw exception
-                }
-            }
-            .map { preferences ->
-                preferences[PreferenceKeys.VIBRATION_ENABLED] ?: true
-            }
-            .first()
-    }
-    
-    override suspend fun setVibrationEnabled(enabled: Boolean) {
-        dataStore.edit { preferences ->
-            preferences[PreferenceKeys.VIBRATION_ENABLED] = enabled
-        }
-    }
+
     
     override suspend fun isSoundEnabled(): Boolean {
         return dataStore.data
@@ -451,7 +432,7 @@ class PreferencesRepositoryImpl @Inject constructor(
                     "notificationEnabled" to preferences[PreferenceKeys.NOTIFICATION_ENABLED],
                     "dailyReminderTime" to preferences[PreferenceKeys.DAILY_REMINDER_TIME],
                     "achievementNotification" to preferences[PreferenceKeys.ACHIEVEMENT_NOTIFICATION],
-                    "vibrationEnabled" to preferences[PreferenceKeys.VIBRATION_ENABLED],
+
                     "soundEnabled" to preferences[PreferenceKeys.SOUND_ENABLED],
                     "themeMode" to preferences[PreferenceKeys.THEME_MODE],
                     "language" to preferences[PreferenceKeys.LANGUAGE],
@@ -472,7 +453,7 @@ class PreferencesRepositoryImpl @Inject constructor(
             preferences[PreferenceKeys.DEFAULT_TARGET_COUNT] = Constants.DEFAULT_TARGET_COUNT
             preferences[PreferenceKeys.NOTIFICATION_ENABLED] = true
             preferences[PreferenceKeys.ACHIEVEMENT_NOTIFICATION] = true
-            preferences[PreferenceKeys.VIBRATION_ENABLED] = true
+
             preferences[PreferenceKeys.SOUND_ENABLED] = true
             preferences[PreferenceKeys.THEME_MODE] = ThemeMode.SYSTEM.name
             preferences[PreferenceKeys.LANGUAGE] = "ko"

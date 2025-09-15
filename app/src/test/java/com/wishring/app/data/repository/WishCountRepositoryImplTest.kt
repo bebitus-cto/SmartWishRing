@@ -7,6 +7,8 @@ import com.wishring.app.data.local.entity.ResetLogEntity
 import com.wishring.app.domain.model.WishCount
 import com.wishring.app.domain.model.ResetLog
 import com.wishring.app.domain.repository.WishCountRepository
+import com.wishring.app.data.local.database.entity.WishData
+import kotlinx.serialization.json.Json
 import io.mockk.*
 import io.mockk.impl.annotations.MockK
 import io.mockk.impl.annotations.RelaxedMockK
@@ -626,6 +628,227 @@ class WishCountRepositoryImplTest {
         reason = reason
     )
     
+    
+    @Nested
+    @DisplayName("다중 위시 기능 테스트")
+    inner class MultipleWishesTests {
+        
+        @Test
+        @DisplayName("오늘의 여러 위시 조회")
+        fun `should get today's wishes`() = runTest(testDispatcher) {
+            // Given
+            val today = LocalDate.now()
+            val wishData1 = WishData("첫 번째 위시", 1000, 50)
+            val wishData2 = WishData("두 번째 위시", 2000, 100)
+            val wishData3 = WishData("세 번째 위시", 1500, 75)
+            val wishesJson = Json.encodeToString(listOf(wishData1, wishData2, wishData3))
+            
+            val entity = createWishCountEntity(date = today).copy(
+                wishesJson = wishesJson,
+                activeWishIndex = 1
+            )
+            
+            coEvery { wishCountDao.getWishCountByDateSuspend(today) } returns entity
+            
+            // When
+            val result = repository.getTodayWishes()
+            
+            // Then
+            result shouldHaveSize 3
+            result[0].text shouldBe "첫 번째 위시"
+            result[0].targetCount shouldBe 1000
+            result[0].currentCount shouldBe 50
+            
+            result[1].text shouldBe "두 번째 위시"
+            result[1].targetCount shouldBe 2000
+            result[1].currentCount shouldBe 100
+            
+            coVerify { wishCountDao.getWishCountByDateSuspend(today) }
+        }
+        
+        @Test
+        @DisplayName("활성 위시 인덱스 조회")
+        fun `should get active wish index`() = runTest(testDispatcher) {
+            // Given
+            val today = LocalDate.now()
+            val entity = createWishCountEntity(date = today).copy(activeWishIndex = 2)
+            
+            coEvery { wishCountDao.getWishCountByDateSuspend(today) } returns entity
+            
+            // When
+            val result = repository.getActiveWishIndex()
+            
+            // Then
+            result shouldBe 2
+            
+            coVerify { wishCountDao.getWishCountByDateSuspend(today) }
+        }
+        
+        @Test
+        @DisplayName("활성 위시 인덱스 설정")
+        fun `should set active wish index`() = runTest(testDispatcher) {
+            // Given
+            val today = LocalDate.now()
+            val wishData = listOf(
+                WishData("위시 1", 1000, 10),
+                WishData("위시 2", 2000, 20),
+                WishData("위시 3", 3000, 30)
+            )
+            val wishesJson = Json.encodeToString(wishData)
+            val entity = createWishCountEntity(date = today).copy(
+                wishesJson = wishesJson,
+                activeWishIndex = 0
+            )
+            
+            coEvery { wishCountDao.getWishCountByDateSuspend(today) } returns entity
+            coEvery { wishCountDao.upsert(any()) } just Runs
+            
+            // When
+            val result = repository.setActiveWishIndex(2)
+            
+            // Then
+            result shouldNotBe null
+            
+            coVerify { 
+                wishCountDao.upsert(match { 
+                    it.activeWishIndex == 2 
+                })
+            }
+        }
+        
+        @Test
+        @DisplayName("여러 위시와 목표 카운트 업데이트")
+        fun `should update today wishes and target`() = runTest(testDispatcher) {
+            // Given
+            val today = LocalDate.now()
+            val wishDataList = listOf(
+                WishData("새 위시 1", 1200, 0),
+                WishData("새 위시 2", 1800, 0)
+            )
+            val activeWishIndex = 1
+            
+            val existingEntity = createWishCountEntity(date = today)
+            coEvery { wishCountDao.getWishCountByDateSuspend(today) } returns existingEntity
+            coEvery { wishCountDao.upsert(any()) } just Runs
+            
+            // When
+            val result = repository.updateTodayWishesAndTarget(wishDataList, activeWishIndex)
+            
+            // Then
+            result shouldNotBe null
+            
+            coVerify { 
+                wishCountDao.upsert(match { entity ->
+                    val savedWishes = entity.parseWishes()
+                    savedWishes.size == 2 &&
+                    savedWishes[0].text == "새 위시 1" &&
+                    savedWishes[1].text == "새 위시 2" &&
+                    entity.activeWishIndex == 1
+                })
+            }
+        }
+        
+        @Test
+        @DisplayName("활성 위시만 증가")
+        fun `should increment only active wish count`() = runTest(testDispatcher) {
+            // Given
+            val today = LocalDate.now()
+            val wishData = listOf(
+                WishData("위시 1", 1000, 10),
+                WishData("위시 2", 2000, 20), // 활성 위시
+                WishData("위시 3", 3000, 30)
+            )
+            val wishesJson = Json.encodeToString(wishData)
+            val entity = createWishCountEntity(date = today).copy(
+                wishesJson = wishesJson,
+                activeWishIndex = 1 // 두 번째 위시가 활성
+            )
+            
+            coEvery { wishCountDao.getWishCountByDateSuspend(today) } returns entity
+            coEvery { wishCountDao.upsert(any()) } just Runs
+            
+            // When
+            val result = repository.incrementTodayCount(5)
+            
+            // Then
+            result shouldNotBe null
+            
+            coVerify { 
+                wishCountDao.upsert(match { updatedEntity ->
+                    val updatedWishes = updatedEntity.parseWishes()
+                    updatedWishes.size == 3 &&
+                    updatedWishes[0].currentCount == 10 && // 변경되지 않음
+                    updatedWishes[1].currentCount == 25 && // 20 + 5 = 25
+                    updatedWishes[2].currentCount == 30    // 변경되지 않음
+                })
+            }
+        }
+        
+        @Test
+        @DisplayName("빈 위시 목록 처리")
+        fun `should handle empty wishes list`() = runTest(testDispatcher) {
+            // Given
+            val today = LocalDate.now()
+            val entity = createWishCountEntity(date = today).copy(
+                wishesJson = "[]",
+                activeWishIndex = 0
+            )
+            
+            coEvery { wishCountDao.getWishCountByDateSuspend(today) } returns entity
+            
+            // When
+            val result = repository.getTodayWishes()
+            
+            // Then
+            result shouldHaveSize 0
+            
+            coVerify { wishCountDao.getWishCountByDateSuspend(today) }
+        }
+        
+        @Test
+        @DisplayName("잘못된 활성 위시 인덱스 처리")
+        fun `should handle invalid active wish index`() = runTest(testDispatcher) {
+            // Given
+            val today = LocalDate.now()
+            val wishData = listOf(WishData("위시 1", 1000, 10))
+            val wishesJson = Json.encodeToString(wishData)
+            val entity = createWishCountEntity(date = today).copy(
+                wishesJson = wishesJson,
+                activeWishIndex = 5 // 범위를 벗어난 인덱스
+            )
+            
+            coEvery { wishCountDao.getWishCountByDateSuspend(today) } returns entity
+            
+            // When
+            val result = repository.getActiveWishIndex()
+            
+            // Then
+            result shouldBe 5 // 저장된 값 그대로 반환 (상위 레이어에서 처리)
+            
+            coVerify { wishCountDao.getWishCountByDateSuspend(today) }
+        }
+        
+        @Test
+        @DisplayName("JSON 파싱 오류 처리")
+        fun `should handle JSON parsing errors gracefully`() = runTest(testDispatcher) {
+            // Given
+            val today = LocalDate.now()
+            val entity = createWishCountEntity(date = today).copy(
+                wishesJson = "invalid json",
+                activeWishIndex = 0
+            )
+            
+            coEvery { wishCountDao.getWishCountByDateSuspend(today) } returns entity
+            
+            // When & Then
+            assertThrows<Exception> {
+                runTest { repository.getTodayWishes() }
+            }
+            
+            coVerify { wishCountDao.getWishCountByDateSuspend(today) }
+        }
+    }
+
     private fun createStreakTestData(): List<WishCountEntity> {
         val today = LocalDate.now()
         return listOf(

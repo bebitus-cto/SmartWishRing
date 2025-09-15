@@ -11,10 +11,10 @@ object BleConstants {
     // ===== Service & Characteristic UUIDs =====
     
     /** Main Service UUID - PRD 문서 기준 */
-    const val SERVICE_UUID = "0000fff0-0000-1000-8000-00805f9b34fb"
+    const val SERVICE_UUID = "f000efe0-0451-4000-0000-00000000b000"
     
-    /** Counter Characteristic UUID - 카운터 데이터 송수신 */
-    const val COUNTER_CHAR_UUID = "0000fff1-0000-1000-8000-00805f9b34fb"
+    /** Counter Characteristic UUID - 카운터 데이터 송수신 (MRD SDK Notify) */
+    const val COUNTER_CHAR_UUID = "f000efe3-0451-4000-0000-00000000b000"
     
     /** Battery Characteristic UUID - 배터리 정보 */
     const val BATTERY_CHAR_UUID = "0000fff2-0000-1000-8000-00805f9b34fb"
@@ -26,12 +26,6 @@ object BleConstants {
     const val CCCD_UUID = "00002902-0000-1000-8000-00805f9b34fb"
     
     // ===== Device Identification =====
-    
-    /** WISH RING 기기명 접두사 */
-    const val DEVICE_NAME_PREFIX = "WISH_RING"
-    
-    /** 대체 기기명 접두사 (호환성) */
-    const val DEVICE_NAME_PREFIX_ALT = "WishRing"
     
     /** MRD 기기명 접두사 (SDK 기준) */
     const val MRD_DEVICE_PREFIX = "MRD"
@@ -159,16 +153,13 @@ object BleConstants {
     // ===== Utility Functions =====
     
     /**
-     * 기기명이 WISH RING 기기인지 확인
+     * 모든 BLE 기기를 허용 (사용자가 직접 선택)
      * @param deviceName 검사할 기기명
-     * @return WISH RING 기기 여부
+     * @return 항상 true (모든 기기 허용)
      */
-    fun isWishRingDeviceName(deviceName: String?): Boolean {
-        return deviceName?.let { name ->
-            name.startsWith(DEVICE_NAME_PREFIX, ignoreCase = true) ||
-            name.startsWith(DEVICE_NAME_PREFIX_ALT, ignoreCase = true) ||
-            name.startsWith(MRD_DEVICE_PREFIX, ignoreCase = true)
-        } ?: false
+    fun isValidBleDevice(deviceName: String?): Boolean {
+        // 이름이 있는 모든 BLE 기기 허용
+        return !deviceName.isNullOrBlank()
     }
     
     /**

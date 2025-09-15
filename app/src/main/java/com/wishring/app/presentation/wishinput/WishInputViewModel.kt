@@ -7,6 +7,9 @@ import com.wishring.app.domain.model.WishCount
 import com.wishring.app.domain.repository.WishCountRepository
 import com.wishring.app.domain.repository.PreferencesRepository
 import com.wishring.app.presentation.wishinput.model.WishItem
+import com.wishring.app.presentation.wishinput.model.toWishDataList
+import com.wishring.app.presentation.wishinput.model.toWishItemList
+import com.wishring.app.presentation.wishinput.model.toWishDataList
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
@@ -48,18 +51,16 @@ class WishInputViewModel @Inject constructor(
             is WishInputEvent.UpdateWishCount -> updateWishCount(event.wishId, event.count)
             is WishInputEvent.SelectSuggestedWish -> selectSuggestedWish(event.wish)
             WishInputEvent.ToggleSuggestions -> toggleSuggestions()
-            WishInputEvent.ShowTargetCountPicker -> showTargetCountPicker()
-            WishInputEvent.HideTargetCountPicker -> hideTargetCountPicker()
             WishInputEvent.SaveWish -> saveWish()
             WishInputEvent.DeleteWish -> deleteWish()
             WishInputEvent.ShowDeleteConfirmation -> showDeleteConfirmation()
             WishInputEvent.HideDeleteConfirmation -> hideDeleteConfirmation()
             WishInputEvent.ConfirmDelete -> confirmDelete()
             WishInputEvent.NavigateBack -> navigateBack()
-            WishInputEvent.ClearWishText -> clearWishText()
             WishInputEvent.ResetToDefaults -> resetToDefaults()
             is WishInputEvent.LoadExistingRecord -> loadExistingRecord(event.date)
             WishInputEvent.DismissError -> dismissError()
+            WishInputEvent.ClearWishText -> clearWishText()
             WishInputEvent.ValidateWish -> validateWish()
         }
     }
@@ -85,18 +86,36 @@ class WishInputViewModel @Inject constructor(
     
     private fun checkForExistingRecord() {
         viewModelScope.launch {
-            val today = LocalDate.now()
-            val record = wishCountRepository.getDailyRecord(today.toString())
-            if (record != null && record.wishText.isNotBlank()) {
-                // Convert existing record to wish item
-                val existingWish = WishItem.create(record.wishText, record.targetCount)
-                _uiState.update { state ->
-                    state.copy(
-                        wishes = listOf(existingWish),
-                        isEditMode = true,
-                        existingRecord = true
-                    )
+            try {
+                val today = LocalDate.now()
+                val todayWishes = wishCountRepository.getTodayWishes()
+                
+                if (todayWishes.isNotEmpty()) {
+                    // Convert existing wishes to WishItem list
+                    val existingWishes = todayWishes.toWishItemList()
+                    _uiState.update { state ->
+                        state.copy(
+                            wishes = existingWishes,
+                            isEditMode = true,
+                            existingRecord = true
+                        )
+                    }
+                } else {
+                    // Fallback to old single wish approach for backward compatibility
+                    val record = wishCountRepository.getDailyRecord(today.toString())
+                    if (record != null && record.wishText.isNotBlank()) {
+                        val existingWish = WishItem.create(record.wishText, record.targetCount)
+                        _uiState.update { state ->
+                            state.copy(
+                                wishes = listOf(existingWish),
+                                isEditMode = true,
+                                existingRecord = true
+                            )
+                        }
+                    }
                 }
+            } catch (e: Exception) {
+                // Handle error silently, keep default state
             }
         }
     }
@@ -192,25 +211,6 @@ class WishInputViewModel @Inject constructor(
         }
     }
     
-    private fun showTargetCountPicker() {
-        viewModelScope.launch {
-            _effect.send(WishInputEffect.ShowNumberPicker(
-                currentValue = 1000, // Default value since we handle multiple wishes
-                minValue = _uiState.value.minTargetCount,
-                maxValue = _uiState.value.maxTargetCount,
-                onValueSelected = { count ->
-                    // This would need to be updated when we know which wish to update
-                    // For now, we'll handle target count changes directly in the component
-                }
-            ))
-        }
-    }
-    
-    private fun hideTargetCountPicker() {
-        _uiState.update { state ->
-            state.copy(showTargetCountPicker = false)
-        }
-    }
     
     private fun saveWish() {
         val currentState = _uiState.value
@@ -228,22 +228,22 @@ class WishInputViewModel @Inject constructor(
             _uiState.update { state -> state.copy(isSaving = true) }
             
             try {
-                // Save only valid wishes (combine multiple wishes into one text)
+                // Save all valid wishes as JSON in the database
                 val validWishes = currentState.wishes.filter { it.isValid }
                 
                 if (validWishes.isNotEmpty()) {
-                    // For now, save the first valid wish to maintain compatibility
-                    // In future versions, this could be enhanced to save multiple wishes
-                    val firstWish = validWishes.first()
+                    // Convert WishItems to WishData format for storage
+                    val wishDataList = validWishes.toWishDataList()
                     
-                    wishCountRepository.updateTodayWishAndTarget(
-                        wishText = firstWish.text,
-                        targetCount = firstWish.targetCount
+                    // Update repository with multiple wishes
+                    wishCountRepository.updateTodayWishesAndTarget(
+                        wishesData = wishDataList,
+                        activeWishIndex = 0 // Default to first wish as active
                     )
                     
-                    // Handle 12시 넘김 edge case
+                    // Handle date change edge case
                     val currentDate = LocalDate.now()
-                    val wishCreationDate = firstWish.creationDate
+                    val wishCreationDate = validWishes.first().creationDate
                     
                     if (currentDate != wishCreationDate) {
                         _effect.send(WishInputEffect.ShowToast(
@@ -320,14 +320,6 @@ class WishInputViewModel @Inject constructor(
         }
     }
     
-    private fun clearWishText() {
-        _uiState.update { state ->
-            val clearedWishes = state.wishes.map { wish ->
-                wish.copy(text = "")
-            }
-            state.copy(wishes = clearedWishes)
-        }
-    }
     
     private fun resetToDefaults() {
         _uiState.update { state ->
@@ -343,6 +335,10 @@ class WishInputViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val recordDate = LocalDate.parse(date)
+                
+                // Try to get wishes for the specific date
+                // Note: This would need a new repository method getTodayWishes(date: String)
+                // For now, we'll use the existing getDailyRecord as fallback
                 val record = wishCountRepository.getDailyRecord(recordDate.toString())
                 if (record != null && record.wishText.isNotBlank()) {
                     val existingWish = WishItem.create(record.wishText, record.targetCount)
@@ -380,6 +376,15 @@ class WishInputViewModel @Inject constructor(
                     "최소 하나의 위시를 입력해주세요"
                 ))
             }
+        }
+    }
+    
+    private fun clearWishText() {
+        _uiState.update { state ->
+            val updatedWishes = state.wishes.map { wish ->
+                wish.copy(text = "")
+            }
+            state.copy(wishes = updatedWishes)
         }
     }
 }

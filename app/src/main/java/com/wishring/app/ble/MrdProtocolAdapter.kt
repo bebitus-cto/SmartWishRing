@@ -2,49 +2,61 @@ package com.wishring.app.ble
 
 import android.content.Context
 import android.util.Log
-import com.wishring.app.domain.model.*
-import com.wishring.app.domain.model.SystemInfoType
-import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.awaitClose
+import com.manridy.sdk_mrd2019.Manridy
+// import com.manridy.sdk_mrd2019.MrdReadCallBack
+// import com.manridy.sdk_mrd2019.MrdReadEnum
+import com.manridy.sdk_mrd2019.bean.send.SystemEnum
+import com.manridy.sdk_mrd2019.read.MrdReadRequest
 import kotlinx.coroutines.flow.*
-import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.coroutines.Continuation
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
-import kotlinx.coroutines.suspendCancellableCoroutine
 
 /**
  * MRD SDK Protocol Adapter
- * Handles MRD SDK communication and converts callbacks to coroutine-based APIs
+ * Handles battery and counter operations only
  */
 @Singleton
 class MrdProtocolAdapter @Inject constructor(
     private val context: Context
 ) {
     
-    // TODO: Replace with actual MRD SDK classes when available
-    // import com.manridy.sdk.*
-    // import com.manridy.sdk.listener.CmdReturnListener
-    // import com.manridy.sdk.enums.MrdReadEnum
-    
-    // Request-Response handling
-    private val pendingRequests = ConcurrentHashMap<String, Continuation<Any>>()
-    
-    // Real-time data streams
-    private val _realTimeHeartRate = MutableSharedFlow<HeartRateData>()
-    private val _realTimeEcg = MutableSharedFlow<EcgData>()
-    private val _realTimeBloodPressure = MutableSharedFlow<BloodPressureData>()
-    private val _healthDataUpdates = MutableSharedFlow<HealthDataUpdate>()
-    private val _deviceStatus = MutableSharedFlow<DeviceStatus>()
+    // Button press events stream
+    private val _buttonPresses = MutableSharedFlow<Int>()
     
     // Command callback to BleRepositoryImpl
     private var onCommandReadyCallback: ((ByteArray) -> Unit)? = null
     
-    // SDK instances (placeholders for now)
-    private var manridyInstance: Any? = null
+    // SDK initialization status
     private var isInitialized = false
+    
+    // 디버깅용 이벤트 히스토리
+    data class EventHistoryItem(
+        val timestamp: Long,
+        val eventType: String,
+        val jsonData: String,
+        val description: String = ""
+    )
+    
+    private val _eventHistory = mutableListOf<EventHistoryItem>()
+    private val _eventHistoryFlow = MutableSharedFlow<List<EventHistoryItem>>()
+    
+    /**
+     * 이벤트 히스토리 관찰용 플로우
+     */
+    fun getEventHistoryFlow(): Flow<List<EventHistoryItem>> = _eventHistoryFlow.asSharedFlow()
+    
+    /**
+     * 현재 이벤트 히스토리 목록 가져오기
+     */
+    fun getEventHistory(): List<EventHistoryItem> = _eventHistory.toList()
+    
+    /**
+     * 이벤트 히스토리 초기화
+     */
+    fun clearEventHistory() {
+        _eventHistory.clear()
+        _eventHistoryFlow.tryEmit(_eventHistory.toList())
+    }
     
     /**
      * Initialize MRD SDK and setup callbacks
@@ -53,15 +65,9 @@ class MrdProtocolAdapter @Inject constructor(
         this.onCommandReadyCallback = onCommandReady
         
         try {
-            // TODO: Replace with actual SDK initialization
-            // manridyInstance = Manridy.getInstance()
-            // manridyInstance?.init(context)
-            // manridyInstance?.setCmdReturnListener(cmdReturnListener)
-            
-            // Placeholder initialization
-            manridyInstance = createMockManridyInstance()
+            // MRD SDK should already be initialized in Application class
             isInitialized = true
-            
+            Log.d("MrdProtocolAdapter", "MRD Protocol Adapter initialized successfully")
         } catch (e: Exception) {
             throw IllegalStateException("Failed to initialize MRD SDK", e)
         }
@@ -75,355 +81,114 @@ class MrdProtocolAdapter @Inject constructor(
         if (!isInitialized) return
         
         try {
-            // TODO: Replace with actual SDK data parsing
-            // manridyInstance?.parseReceivedData(data)
-            
-            // Mock data parsing for now
-            mockDataParsing(data)
-            
+            // Use MRD SDK for data parsing
+            val readRequest: MrdReadRequest = Manridy.getMrdRead().read(data)
+            handleParsedData(readRequest)
         } catch (e: Exception) {
-            // Handle parsing errors
-            cancelAllPendingRequests(e)
+            Log.e("MrdProtocolAdapter", "Error parsing received data", e)
         }
     }
     
     /**
-     * Get system information
+     * Request battery level from device
      */
-    suspend fun getSystemInfo(type: SystemInfoType): String = withTimeout(5000L) {
-        suspendCancellableCoroutine { continuation ->
-            val requestId = "system_info_${type.name}"
-            pendingRequests[requestId] = continuation as Continuation<Any>
-            
-            // Generate command using SDK
-            val command = generateSystemInfoCommand(type)
-            onCommandReadyCallback?.invoke(command)
-            
-            // Setup timeout
-            continuation.invokeOnCancellation {
-                pendingRequests.remove(requestId)
-            }
-        }
-    }
-    
-    /**
-     * Set user profile information
-     */
-    suspend fun setUserProfile(userProfile: UserProfile): Boolean = withTimeout(5000L) {
-        suspendCancellableCoroutine { continuation ->
-            val requestId = "set_user_profile"
-            pendingRequests[requestId] = continuation as Continuation<Any>
-            
-            // Generate command using SDK
-            val command = generateUserProfileCommand(userProfile)
-            onCommandReadyCallback?.invoke(command)
-            
-            continuation.invokeOnCancellation {
-                pendingRequests.remove(requestId)
-            }
-        }
-    }
-    
-    /**
-     * Get latest heart rate data
-     */
-    suspend fun getLatestHeartRate(): HeartRateData = withTimeout(5000L) {
-        suspendCancellableCoroutine { continuation ->
-            val requestId = "get_heart_rate_last"
-            pendingRequests[requestId] = continuation as Continuation<Any>
-            
-            // Generate command using SDK
-            val command = generateHeartRateCommand(isRealTime = false)
-            onCommandReadyCallback?.invoke(command)
-            
-            continuation.invokeOnCancellation {
-                pendingRequests.remove(requestId)
-            }
-        }
-    }
-    
-    /**
-     * Get sleep data
-     */
-    suspend fun getSleepData(date: String?): SleepData = withTimeout(5000L) {
-        suspendCancellableCoroutine { continuation ->
-            val requestId = "get_sleep_data"
-            pendingRequests[requestId] = continuation as Continuation<Any>
-            
-            // Generate command using SDK
-            val command = generateSleepDataCommand(date)
-            onCommandReadyCallback?.invoke(command)
-            
-            continuation.invokeOnCancellation {
-                pendingRequests.remove(requestId)
-            }
-        }
-    }
-    
-    /**
-     * Get step data
-     */
-    suspend fun getStepData(date: String?): StepData = withTimeout(5000L) {
-        suspendCancellableCoroutine { continuation ->
-            val requestId = "get_step_data"
-            pendingRequests[requestId] = continuation as Continuation<Any>
-            
-            // Generate command using SDK
-            val command = generateStepDataCommand(date)
-            onCommandReadyCallback?.invoke(command)
-            
-            continuation.invokeOnCancellation {
-                pendingRequests.remove(requestId)
-            }
-        }
-    }
-    
-    /**
-     * Start real-time heart rate measurement
-     */
-    fun startRealTimeHeartRate(): Flow<HeartRateData> = callbackFlow {
+    fun requestBatteryLevel() {
+        if (!isInitialized) return
         
-        // Send start command
-        val startCommand = generateHeartRateCommand(isRealTime = true, start = true)
-        onCommandReadyCallback?.invoke(startCommand)
-        
-        // Subscribe to real-time data
-        val job = _realTimeHeartRate.onEach { heartRateData ->
-            trySend(heartRateData)
-        }.launchIn(this)
-        
-        awaitClose {
-            job.cancel()
-            // Send stop command
-            val stopCommand = generateHeartRateCommand(isRealTime = true, start = false)
-            onCommandReadyCallback?.invoke(stopCommand)
-        }
-    }
-    
-    /**
-     * Start real-time ECG measurement
-     */
-    fun startRealTimeEcg(): Flow<EcgData> = callbackFlow {
-        
-        // Send start command
-        val startCommand = generateEcgCommand(start = true)
-        onCommandReadyCallback?.invoke(startCommand)
-        
-        // Subscribe to real-time data
-        val job = _realTimeEcg.onEach { ecgData ->
-            trySend(ecgData)
-        }.launchIn(this)
-        
-        awaitClose {
-            job.cancel()
-            // Send stop command
-            val stopCommand = generateEcgCommand(start = false)
-            onCommandReadyCallback?.invoke(stopCommand)
-        }
-    }
-    
-    /**
-     * Send app notification to device
-     */
-    suspend fun sendAppNotification(notification: AppNotification): Boolean = withTimeout(5000L) {
-        suspendCancellableCoroutine { continuation ->
-            val requestId = "send_notification"
-            pendingRequests[requestId] = continuation as Continuation<Any>
-            
-            // Generate command using SDK
-            val command = generateNotificationCommand(notification)
+        try {
+            val command = Manridy.getMrdSend().getSystem(SystemEnum.battery).getDatas()
             onCommandReadyCallback?.invoke(command)
-            
-            continuation.invokeOnCancellation {
-                pendingRequests.remove(requestId)
-            }
+        } catch (e: Exception) {
+            Log.e("MrdProtocolAdapter", "Error requesting battery level", e)
         }
     }
     
     /**
-     * Subscribe to health data updates
+     * Subscribe to button press events from the device
+     * HEART events = button presses for wish counting
      */
-    fun subscribeToHealthDataUpdates(): Flow<HealthDataUpdate> = _healthDataUpdates.asSharedFlow()
+    fun subscribeToButtonPresses(): Flow<Int> = _buttonPresses.asSharedFlow()
+    
     
     /**
-     * Subscribe to device status updates
+     * 이벤트 히스토리에 추가
      */
-    fun subscribeToDeviceStatus(): Flow<DeviceStatus> = _deviceStatus.asSharedFlow()
-    
-    /**
-     * Cancel all pending requests
-     */
-    fun cancelAllPendingRequests(exception: Exception = Exception("Operation cancelled")) {
-        pendingRequests.values.forEach { continuation ->
-            continuation.resumeWithException(exception)
-        }
-        pendingRequests.clear()
-    }
-    
-    // TODO: Replace with actual SDK command generation methods
-    private fun generateSystemInfoCommand(type: SystemInfoType): ByteArray {
-        // Placeholder: return Manridy.getMrdSend().getSystem(SystemEnum.BATTERY)
-        return when (type) {
-            SystemInfoType.BATTERY -> byteArrayOf(0x01, 0x02, 0x01)
-            SystemInfoType.FIRMWARE_VERSION -> byteArrayOf(0x01, 0x02, 0x02)
-            SystemInfoType.HARDWARE_VERSION -> byteArrayOf(0x01, 0x02, 0x03)
-            else -> byteArrayOf(0x01, 0x02, 0x00)
-        }
-    }
-    
-    private fun generateUserProfileCommand(userProfile: UserProfile): ByteArray {
-        // Placeholder: return Manridy.getMrdSend().setUserInfo(mrdUserInfo)
-        return byteArrayOf(0x02, 0x01, 
-            userProfile.height.toByte(), 
-            userProfile.weight.toByte(),
-            userProfile.age.toByte(),
-            if (userProfile.gender == Gender.MALE) 1 else 0
+    private fun addToEventHistory(eventType: String, jsonData: String) {
+        val item = EventHistoryItem(
+            timestamp = System.currentTimeMillis(),
+            eventType = eventType,
+            jsonData = jsonData,
+            description = getEventDescription(eventType)
         )
-    }
-    
-    private fun generateHeartRateCommand(isRealTime: Boolean, start: Boolean = true): ByteArray {
-        // Placeholder: return Manridy.getMrdSend().getHeartRate() or testHeartRateEcg()
-        return if (isRealTime) {
-            byteArrayOf(0x03, 0x01, if (start) 1 else 0)
-        } else {
-            byteArrayOf(0x03, 0x02, 0x01)
-        }
-    }
-    
-    private fun generateSleepDataCommand(date: String?): ByteArray {
-        // Placeholder: return Manridy.getMrdSend().getSleepData()
-        return byteArrayOf(0x04, 0x01, 0x01)
-    }
-    
-    private fun generateStepDataCommand(date: String?): ByteArray {
-        // Placeholder: return Manridy.getMrdSend().getStepData()
-        return byteArrayOf(0x05, 0x01, 0x01)
-    }
-    
-    private fun generateEcgCommand(start: Boolean): ByteArray {
-        // Placeholder: return Manridy.getMrdSend().testHeartRateEcg()
-        return byteArrayOf(0x06, 0x01, if (start) 1 else 0)
-    }
-    
-    private fun generateNotificationCommand(notification: AppNotification): ByteArray {
-        // Placeholder: return Manridy.getMrdSend().sendAppPush(appPush)
-        return byteArrayOf(0x07, 0x01, notification.type.ordinal.toByte())
-    }
-    
-    // Mock SDK instance for testing
-    private fun createMockManridyInstance(): Any {
-        return object {
-            fun init() = Unit
-            fun getMrdSend() = this
-            fun parseData(data: ByteArray) = mockDataParsing(data)
-        }
-    }
-    
-    // Mock data parsing for testing
-    private fun mockDataParsing(data: ByteArray) {
-        if (data.isEmpty()) return
         
-        when (data[0].toInt()) {
-            0x01 -> { // System info response
-                val info = when (data.getOrNull(2)?.toInt()) {
-                    0x01 -> "85" // Battery
-                    0x02 -> "1.1.5" // Firmware
-                    0x03 -> "1.0" // Hardware
-                    else -> "Unknown"
-                }
-                pendingRequests.remove("system_info_${SystemInfoType.values()[data.getOrNull(2)?.toInt() ?: 0].name}")?.resume(info)
-            }
-            0x02 -> { // User profile response
-                pendingRequests.remove("set_user_profile")?.resume(true)
-            }
-            0x03 -> { // Heart rate response
-                if (data.getOrNull(1) == 0x01.toByte()) { // Real-time
-                    val bpm = data.getOrNull(2)?.toInt() ?: 75
-                    _realTimeHeartRate.tryEmit(HeartRateData(bpm, System.currentTimeMillis()))
-                } else { // Single query
-                    val bpm = data.getOrNull(2)?.toInt() ?: 75
-                    pendingRequests.remove("get_heart_rate_last")?.resume(
-                        HeartRateData(bpm, System.currentTimeMillis())
-                    )
-                }
-            }
-            0x04 -> { // Sleep data response
-                val sleepData = SleepData(
-                    date = "2024-01-15",
-                    totalSleepMinutes = 480,
-                    deepSleepMinutes = 120,
-                    lightSleepMinutes = 300,
-                    remSleepMinutes = 60,
-                    awakeMinutes = 30,
-                    sleepQuality = SleepQuality.GOOD,
-                    bedTime = "22:30",
-                    wakeTime = "06:30"
-                )
-                pendingRequests.remove("get_sleep_data")?.resume(sleepData)
-            }
-            0x05 -> { // Step data response
-                val stepData = StepData(
-                    date = "2024-01-15",
-                    steps = 8500,
-                    distance = 6.5f,
-                    calories = 320,
-                    activeMinutes = 45
-                )
-                pendingRequests.remove("get_step_data")?.resume(stepData)
-            }
-            0x07 -> { // Notification response
-                pendingRequests.remove("send_notification")?.resume(true)
-            }
+        _eventHistory.add(item)
+        
+        // 최대 50개까지만 보관
+        if (_eventHistory.size > 50) {
+            _eventHistory.removeAt(0)
+        }
+        
+        // 업데이트된 히스토리를 플로우로 전송
+        _eventHistoryFlow.tryEmit(_eventHistory.toList())
+        
+        Log.d("MrdProtocolAdapter", "📝 이벤트 히스토리 추가: $eventType (총 ${_eventHistory.size}개)")
+    }
+    
+    /**
+     * 이벤트 타입별 설명
+     */
+    private fun getEventDescription(eventType: String): String {
+        return when (eventType) {
+            "HEART" -> "심박수 데이터 (기존 처리)"
+            "Sport_realTime" -> "운동 실시간 데이터 (가능한 카운터)"
+            "Battery" -> "배터리 정보"
+            "Step_realTime" -> "걸음수 실시간 데이터"
+            "AnswerPhone" -> "전화 받기"
+            "Start_Or_Pause" -> "음악 재생/일시정지"
+            else -> "기타 이벤트"
         }
     }
 
-    
     /**
-     * Activate device finder (LED flash/vibration to help locate device)
+     * Handle parsed data from MRD SDK
      */
-    suspend fun activateDeviceFinder() {
-        if (!isInitialized) return
-        
-        try {
-            // TODO: Replace with actual SDK call when available
-            // manridyInstance.activateDeviceFinder()
-            
-            // Mock implementation - generate device finder activation command
-            val command = generateDeviceFinderCommand(true)
-            onCommandReadyCallback?.invoke(command)
-        } catch (e: Exception) {
-            Log.e("MrdProtocolAdapter", "Error activating device finder: ${e.message}", e)
+    private fun handleParsedData(readRequest: MrdReadRequest) {
+        if (readRequest.status == 0) {
+            Log.w("MrdProtocolAdapter", "Failed to parse data")
+            return
         }
-    }
-    
-    /**
-     * Deactivate device finder (stop LED flash/vibration)
-     */
-    suspend fun deactivateDeviceFinder() {
-        if (!isInitialized) return
         
-        try {
-            // TODO: Replace with actual SDK call when available
-            // manridyInstance.deactivateDeviceFinder()
-            
-            // Mock implementation - generate device finder deactivation command
-            val command = generateDeviceFinderCommand(false)
-            onCommandReadyCallback?.invoke(command)
-        } catch (e: Exception) {
-            Log.e("MrdProtocolAdapter", "Error deactivating device finder: ${e.message}", e)
-        }
-    }
-    
-    /**
-     * Generate device finder command
-     */
-    private fun generateDeviceFinderCommand(activate: Boolean): ByteArray {
-        // Mock command for device finder
-        // TODO: Replace with actual SDK protocol when available
-        return if (activate) {
-            byteArrayOf(0x01.toByte(), 0xFF.toByte(), 0x01.toByte()) // Start find device
-        } else {
-            byteArrayOf(0x01.toByte(), 0xFF.toByte(), 0x00.toByte()) // Stop find device
+        val enumType = readRequest.mrdReadEnum
+        val jsonData = readRequest.json
+        
+        // ✅ 모든 이벤트를 상세히 로그로 기록 (디버깅용)
+        Log.d("MrdProtocolAdapter", "========================================")
+        Log.d("MrdProtocolAdapter", "🔍 [이벤트 수신] 타입: ${enumType.name}")
+        Log.d("MrdProtocolAdapter", "📊 [JSON 데이터]: $jsonData")
+        Log.d("MrdProtocolAdapter", "⚡ [상태코드]: ${readRequest.status}")
+        Log.d("MrdProtocolAdapter", "========================================")
+        
+        // 이벤트 히스토리에 추가
+        addToEventHistory(enumType.name, jsonData)
+        
+        // Process based on the response type
+        when (enumType.name) {
+            "Battery" -> {
+                Log.d("MrdProtocolAdapter", "🔋 배터리 데이터 처리 중")
+            }
+            "HEART" -> {
+                Log.d("MrdProtocolAdapter", "💓 HEART 이벤트 감지 - 기존 처리 방식")
+                _buttonPresses.tryEmit(1)
+            }
+            "Sport_realTime" -> {
+                Log.d("MrdProtocolAdapter", "🏃 Sport_realTime 이벤트 감지 - 잠재적 카운터")
+                // TODO: 운동 실시간 데이터에서 카운트 추출
+                Log.d("MrdProtocolAdapter", "Sport_realTime 데이터: $jsonData")
+                _buttonPresses.tryEmit(1) // 임시로 1 전송
+            }
+            else -> {
+                Log.d("MrdProtocolAdapter", "❓ 기타 데이터 타입: ${enumType.name}")
+            }
         }
     }
 }

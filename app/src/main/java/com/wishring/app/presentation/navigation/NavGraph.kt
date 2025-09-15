@@ -11,7 +11,7 @@ import androidx.navigation.navArgument
 import com.wishring.app.presentation.wishdetail.WishDetailScreen
 import com.wishring.app.presentation.home.HomeScreen
 import com.wishring.app.presentation.splash.SplashScreen
-import com.wishring.app.presentation.settings.SettingsScreen
+
 import com.wishring.app.presentation.wishinput.WishInputScreen
 
 /**
@@ -47,9 +47,6 @@ fun WishRingNavGraph(
                 },
                 onNavigateToWishInput = {
                     navController.navigate(Screen.WishInput.route)
-                },
-                onNavigateToSettings = {
-                    navController.navigate(Screen.Settings.route)
                 }
             )
         }
@@ -87,21 +84,6 @@ fun WishRingNavGraph(
                 }
             )
         }
-        
-        // Settings screen
-        composable(route = Screen.Settings.route) {
-            SettingsScreen(
-                onNavigateBack = {
-                    navController.popBackStack()
-                },
-                onNavigateToAbout = {
-                    // Navigate to about screen when implemented
-                },
-                onNavigateToSupport = {
-                    // Navigate to support screen when implemented
-                }
-            )
-        }
     }
 }
 
@@ -112,7 +94,6 @@ sealed class Screen(val route: String) {
     object Splash : Screen("splash")
     object Home : Screen("home")
     object WishInput : Screen("wish_input")
-    object Settings : Screen("settings")
     
     object Detail : Screen("detail?date={date}") {
         const val ARG_DATE = "date"
@@ -142,10 +123,6 @@ fun NavHostController.navigateToDetail(date: String? = null) {
 
 fun NavHostController.navigateToWishInput() {
     navigate(Screen.WishInput.route)
-}
-
-fun NavHostController.navigateToSettings() {
-    navigate(Screen.Settings.route)
 }
 
 fun NavHostController.navigateSingleTop(route: String) {

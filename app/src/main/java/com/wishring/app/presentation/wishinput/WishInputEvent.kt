@@ -45,15 +45,6 @@ sealed class WishInputEvent {
      */
     object ToggleSuggestions : WishInputEvent()
     
-    /**
-     * Show target count picker
-     */
-    object ShowTargetCountPicker : WishInputEvent()
-    
-    /**
-     * Hide target count picker
-     */
-    object HideTargetCountPicker : WishInputEvent()
     
     /**
      * Save wish
@@ -85,10 +76,6 @@ sealed class WishInputEvent {
      */
     object NavigateBack : WishInputEvent()
     
-    /**
-     * Clear wish text
-     */
-    object ClearWishText : WishInputEvent()
     
     /**
      * Reset to defaults
@@ -105,6 +92,11 @@ sealed class WishInputEvent {
      * Dismiss error
      */
     object DismissError : WishInputEvent()
+    
+    /**
+     * Clear all wish text
+     */
+    object ClearWishText : WishInputEvent()
     
     /**
      * Validate wish text
