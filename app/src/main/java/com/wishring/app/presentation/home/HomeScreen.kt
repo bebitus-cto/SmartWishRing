@@ -50,7 +50,7 @@ import com.wishring.app.MainActivity
 import com.wishring.app.R
 import com.wishring.app.core.util.ShareUtils
 import com.wishring.app.data.model.DailyRecord
-import com.wishring.app.presentation.component.CircularProgress
+import com.wishring.app.presentation.home.component.CircularProgress
 import com.wishring.app.presentation.component.WishCard
 import com.wishring.app.presentation.components.ConnectionSuccessAnimation
 import com.wishring.app.presentation.components.ShareDialog
