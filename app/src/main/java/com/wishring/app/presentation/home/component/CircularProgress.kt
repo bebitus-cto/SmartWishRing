@@ -1,4 +1,4 @@
-package com.wishring.app.presentation.component
+package com.wishring.app.presentation.home.component
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -24,6 +24,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.wishring.app.ui.theme.*
+import kotlin.math.cos
+import kotlin.math.sin
 
 // 간격 상수
 private const val GAP_WIDTH = 3f // 직사각형 가로 길이 (픽셀)
@@ -103,8 +105,8 @@ fun CircularProgress(
             // 2. 진행률 끝 지점 직사각형 (해당 각도로 회전)
             if (progressAngle > 0) {
                 val endAngle = -90f + progressAngle
-                val endX = center.x + radius * kotlin.math.cos(Math.toRadians(endAngle.toDouble())).toFloat()
-                val endY = center.y + radius * kotlin.math.sin(Math.toRadians(endAngle.toDouble())).toFloat()
+                val endX = center.x + radius * cos(Math.toRadians(endAngle.toDouble())).toFloat()
+                val endY = center.y + radius * sin(Math.toRadians(endAngle.toDouble())).toFloat()
                 
                 rotate(endAngle + 90f, pivot = Offset(endX, endY)) {
                     drawRect(
