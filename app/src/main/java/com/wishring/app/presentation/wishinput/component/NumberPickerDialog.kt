@@ -1,4 +1,4 @@
-package com.wishring.app.presentation.component
+package com.wishring.app.presentation.wishinput.component
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape

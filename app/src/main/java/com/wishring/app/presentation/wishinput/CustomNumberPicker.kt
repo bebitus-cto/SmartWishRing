@@ -1,4 +1,4 @@
-package com.wishring.app.presentation.component
+package com.wishring.app.presentation.wishinput
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
