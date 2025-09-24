@@ -5,7 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.wishring.app.core.util.Constants
-import com.wishring.app.data.local.database.dao.WishCountDao
+import com.wishring.app.data.local.database.dao.WishDao
 import com.wishring.app.data.local.database.entity.WishEntity
 
 /**
@@ -18,16 +18,16 @@ import com.wishring.app.data.local.database.entity.WishEntity
     exportSchema = true
 )
 abstract class WishRingDatabase : RoomDatabase() {
-    
+
     /**
      * Get WishCountDao instance
      */
-    abstract fun wishDao(): WishCountDao
-    
+    abstract fun wishDao(): WishDao
+
     companion object {
         @Volatile
         private var INSTANCE: WishRingDatabase? = null
-        
+
         /**
          * Get database instance (Singleton)
          * @param context Application context
@@ -40,12 +40,13 @@ abstract class WishRingDatabase : RoomDatabase() {
                     WishRingDatabase::class.java,
                     Constants.DATABASE_NAME
                 )
+                    .fallbackToDestructiveMigration() // 마이그레이션 실패 시 DB 재생성
                     .build()
                 INSTANCE = instance
                 instance
             }
         }
-        
+
         /**
          * Clear all tables (for testing purposes)
          * WARNING: This will delete all data
@@ -53,7 +54,7 @@ abstract class WishRingDatabase : RoomDatabase() {
         suspend fun clearAllTables() {
             INSTANCE?.clearAllTables()
         }
-        
+
         /**
          * Close database connection
          */

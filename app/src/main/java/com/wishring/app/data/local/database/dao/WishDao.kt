@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.Flow
  * Extends BaseDao for common CRUD operations
  */
 @Dao
-interface WishCountDao : BaseDao<WishEntity> {
+interface WishDao : BaseDao<WishEntity> {
     
     /**
      * Get wish count by date

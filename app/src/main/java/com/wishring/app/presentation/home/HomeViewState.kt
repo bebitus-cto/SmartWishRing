@@ -3,7 +3,6 @@ package com.wishring.app.presentation.home
 import com.wishring.app.data.model.WishUiState
 import com.wishring.app.data.model.DailyRecord
 import com.wishring.app.data.repository.BleConnectionState
-import com.wishring.app.data.repository.StreakInfo
 import com.wishring.app.core.util.Constants
 
 /**
@@ -16,7 +15,6 @@ data class HomeViewState(
     val totalCount: Int = 0,
     val targetCount: Int = Constants.DEFAULT_TARGET_COUNT,
     val recentRecords: List<DailyRecord> = emptyList(),
-    val streakInfo: StreakInfo? = null,
     val bleConnectionState: BleConnectionState = BleConnectionState.DISCONNECTED,
     val deviceBatteryLevel: Int? = null,
     val isRefreshing: Boolean = false,

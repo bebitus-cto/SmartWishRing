@@ -1,12 +1,9 @@
 package com.wishring.app.presentation.home
 
 import android.util.Log
+import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,22 +19,18 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -45,43 +38,32 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.repeatOnLifecycle
-import androidx.lifecycle.Lifecycle
+import com.wishring.app.MainActivity
 import com.wishring.app.R
+import com.wishring.app.core.util.ShareUtils
 import com.wishring.app.data.model.DailyRecord
 import com.wishring.app.presentation.component.CircularProgress
 import com.wishring.app.presentation.component.WishCard
-import com.wishring.app.ui.theme.Purple_Medium
-import com.wishring.app.ui.theme.Purple_Primary
-import com.wishring.app.ui.theme.Text_Primary
-import com.wishring.app.ui.theme.Text_Secondary
-import com.wishring.app.ui.theme.Text_Tertiary
-import com.wishring.app.presentation.components.ShareDialog
-import com.wishring.app.presentation.components.PermissionExplanationDialog
-import com.wishring.app.presentation.components.PermissionDeniedDialog
 import com.wishring.app.presentation.components.ConnectionSuccessAnimation
-import com.wishring.app.core.util.ShareUtils
-import com.wishring.app.MainActivity
-import androidx.activity.ComponentActivity
-import androidx.compose.ui.platform.LocalContext
-import com.wishring.app.data.repository.BleConnectionState
-import com.wishring.app.presentation.main.MainViewModel
+import com.wishring.app.presentation.components.ShareDialog
+import com.wishring.app.presentation.home.component.BleDevicePickerDialog
+import com.wishring.app.presentation.home.component.BluetoothConnectionStatus
+import com.wishring.app.presentation.home.component.FloatingBottomBar
+import com.wishring.app.presentation.home.component.ReportCard
 import com.wishring.app.presentation.main.AutoConnectResult
 import com.wishring.app.presentation.main.DeviceInfo
-
-// Logging tag for event tracking
-private const val WR_EVENT = "WR_EVENT"
+import com.wishring.app.presentation.main.MainViewModel
+import com.wishring.app.presentation.main.MainViewModel.Companion.WR_EVENT
+import com.wishring.app.ui.theme.Purple_Medium
+import com.wishring.app.ui.theme.Purple_Primary
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -97,65 +79,13 @@ fun HomeScreen(
     val context = LocalContext.current
 
     val mainBleState by mainViewModel.bleUiState.collectAsStateWithLifecycle()
-    val mainBatteryLevel = mainBleState.batteryLevel
+
     val isConnected = mainBleState.isConnected
     val scannedDevices = mainBleState.scannedDevices
     val showDevicePicker = mainBleState.shouldShowDevicePicker
 
-    // 배터리 상태 변경 감지 및 HomeViewModel 업데이트
-    LaunchedEffect(mainBatteryLevel) {
-        viewModel.onEvent(HomeEvent.UpdateBatteryLevel(mainBatteryLevel))
-    }
-
-    // BLE 연결 상태 동기화 (백그라운드 복귀 대응)
-    LaunchedEffect(isConnected) {
-        if (isConnected) {
-            // 연결 성공 시 연결 시도 완료 처리
-            viewModel.onEvent(HomeEvent.ConnectionAttemptCompleted)
-        }
-    }
-
-    // 앱 라이프사이클 변화 감지 (백그라운드 복귀 시 상태 확인)
-    val lifecycle = androidx.compose.ui.platform.LocalLifecycleOwner.current.lifecycle
-    LaunchedEffect(lifecycle) {
-        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-            // 앱이 포그라운드로 복귀할 때마다 연결 상태 확인
-            viewModel.checkConnectionState()
-
-            // 실제 연결 상태를 확인해서 동기화
-            val actualState = if (isConnected) {
-                BleConnectionState.CONNECTED
-            } else {
-                BleConnectionState.DISCONNECTED
-            }
-            viewModel.syncConnectionState(actualState)
-        }
-    }
-
-    // 배터리 상태 변경 감지 디버깅
-    LaunchedEffect(uiState.deviceBatteryLevel, isConnected) {
-        Log.i(WR_EVENT, "[BATTERY_DEBUG] ===== HomeScreen 배터리 상태 변경 =====")
-        Log.i(WR_EVENT, "[BATTERY_DEBUG] 연결 상태: $isConnected")
-        Log.i(WR_EVENT, "[BATTERY_DEBUG] 배터리 레벨: ${uiState.deviceBatteryLevel}")
-        Log.i(WR_EVENT, "[BATTERY_DEBUG] UI 표시 조건: $isConnected")
-        Log.i(WR_EVENT, "[BATTERY_DEBUG] =========================================")
-    }
-
-//    // 상태 변경 감지를 위한 LaunchedEffect 추가
-//    LaunchedEffect(showDevicePicker, scannedDevices.size) {
-//        Log.d(WR_EVENT, "[HomeScreen] ===== MainViewModel 상태 변경 감지 =====")
-//        Log.d(WR_EVENT, "[HomeScreen] - showDevicePicker: $showDevicePicker")
-//        Log.d(WR_EVENT, "[HomeScreen] - scannedDevices 크기: ${scannedDevices.size}")
-//        if (scannedDevices.isNotEmpty()) {
-//            Log.d(WR_EVENT, "[HomeScreen] - 첫 번째 기기: ${scannedDevices.first().name}")
-//        }
-//        Log.d(WR_EVENT, "[HomeScreen] ========================================")
-//    }
-
-    // Get MainActivity instance
     val activity = context as? MainActivity
 
-    // Handle navigation effects
     LaunchedEffect(effect) {
         effect?.let { navigationEffect ->
             when (navigationEffect) {
@@ -445,7 +375,6 @@ fun HomeScreenContent(
                                         WR_EVENT,
                                         "[HomeScreen] [MANUAL_CONNECT_DEBUG] 9. StartScanning 이벤트 전송..."
                                     )
-                                    onEvent(HomeEvent.StartScanning)
 
                                     // MainActivity에서 직접 BLE 스캔 시작 (권한 체크 포함됨)
                                     Log.i(
@@ -463,7 +392,6 @@ fun HomeScreenContent(
                                         WR_EVENT,
                                         "[HomeScreen] [MANUAL_CONNECT_DEBUG] 11. 스캔 시간 업데이트..."
                                     )
-                                    onEvent(HomeEvent.UpdateLastBleScanTime(currentTime))
 
                                     Log.i(
                                         WR_EVENT,
@@ -585,39 +513,6 @@ fun HomeScreenContent(
             )
         }
 
-        // Permission explanation dialog
-        if (uiState.showPermissionExplanation) {
-            PermissionExplanationDialog(
-                explanations = uiState.permissionExplanations,
-                onRequestPermissions = {
-                    onEvent(HomeEvent.RequestPermissionsFromExplanation)
-                },
-                onDismiss = {
-                    onEvent(HomeEvent.DismissPermissionExplanation)
-                }
-            )
-        }
-
-        // Permission denied dialog
-        if (uiState.showPermissionDenied) {
-            PermissionDeniedDialog(
-                message = uiState.permissionDeniedMessage,
-                onOpenSettings = {
-                    onEvent(HomeEvent.OpenAppSettingsFromDialog)
-                },
-                onDismiss = {
-                    onEvent(HomeEvent.DismissPermissionDenied)
-                }
-            )
-        }
-
-        // 다이얼로그 표시 시 스캔 완료 이벤트 트리거
-        LaunchedEffect(showDevicePicker && scannedDevices.isNotEmpty()) {
-            if (showDevicePicker && scannedDevices.isNotEmpty()) {
-                onEvent(HomeEvent.ScanCompleted)
-            }
-        }
-
         if (showDevicePicker && scannedDevices.isNotEmpty()) {
             Log.i(WR_EVENT, "[HomeScreen] ===== BLE 기기 선택 다이얼로그 표시 =====")
             BleDevicePickerDialog(
@@ -626,8 +521,6 @@ fun HomeScreenContent(
                 },
                 onDeviceSelected = { deviceAddress ->
                     try {
-                        onEvent(HomeEvent.StartConnectionAttempt)
-
                         if (activity == null) {
                             return@BleDevicePickerDialog
                         }
@@ -651,7 +544,6 @@ fun HomeScreenContent(
             )
         }
 
-        // Connection success animation
         if (uiState.showConnectionSuccessAnimation) {
             ConnectionSuccessAnimation(
                 modifier = Modifier.align(Alignment.Center)
@@ -680,14 +572,11 @@ private fun TodayCountCard(
             modifier = Modifier.padding(vertical = 24.dp)
         ) {
 
-
-            // Count and Progress Row with Divider
             Row(
                 modifier = Modifier.fillMaxWidth().height(120.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Left: Today's Count + Number
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier.weight(1f).fillMaxHeight()
@@ -720,7 +609,6 @@ private fun TodayCountCard(
                         .width(0.5.dp)
                 )
 
-                // Right: Circular Progress
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier.weight(1f).fillMaxHeight()
@@ -862,304 +750,6 @@ private fun WishButton(
             color = Color.White
         )
     }
-}
-
-@Composable
-private fun BluetoothConnectionStatus(
-    onClick: () -> Unit,
-    uiState: HomeViewState,
-    isAutoConnecting: Boolean,
-    modifier: Modifier = Modifier
-) {
-    // 블루투스 연결하기 버튼
-    Button(
-        onClick = onClick,
-        enabled = uiState.isConnectionButtonEnabled(isAutoConnecting),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = if (uiState.shouldShowConnectionLoading(isAutoConnecting)) Color(
-                0xFF90CAF9
-            ) else Color(0xFF2196F3),
-            disabledContainerColor = Color(0xFF90CAF9)
-        ),
-        shape = RoundedCornerShape(8.dp),
-        modifier = modifier
-            .fillMaxWidth()
-            .height(50.dp)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            if (uiState.shouldShowConnectionLoading(isAutoConnecting)) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
-                    color = Color.White,
-                    strokeWidth = 2.dp
-                )
-            } else {
-                Icon(
-                    painter = painterResource(id = android.R.drawable.stat_sys_data_bluetooth),
-                    contentDescription = "블루투스",
-                    tint = Color.White,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = uiState.getConnectionButtonText(isAutoConnecting),
-                style = MaterialTheme.typography.labelLarge.copy(
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
-                ),
-                color = Color.White
-            )
-        }
-    }
-}
-
-@Composable
-private fun ReportCard(
-    uiState: HomeViewState,
-    onEvent: (HomeEvent) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(10.dp),
-        color = Color(0xFFFAFAFA),
-        shadowElevation = 2.dp
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(20.dp)
-        ) {
-            Text(
-                text = buildAnnotatedString {
-                    append("내일을 만드는 ")
-                    withStyle(style = SpanStyle(color = Color(0xFF6A5ACD))) {
-                        append("WISH")
-                    }
-                    append(" 리포트")
-                },
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
-                ),
-                color = Text_Primary,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-
-            // Report content (wish list moved to top section)
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp)
-            ) {
-                Text(
-                    text = "이전 WISH 데이터가 없습니다",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Text_Secondary,
-                    textAlign = TextAlign.Center
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun FloatingBottomBar(
-    uiState: HomeViewState,
-    isConnected: Boolean,
-    onShareClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shadowElevation = 8.dp,
-        color = Color.White
-    ) {
-        Row(
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 30.dp)
-        ) {
-            // Battery status
-            // Battery level display - always show icon, percentage only when connected
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
-            ) {
-
-                // 배터리 아이콘은 항상 표시
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_battery),
-                    contentDescription = stringResource(id = R.string.battery_description),
-                    tint = if (uiState.deviceBatteryLevel != null && uiState.deviceBatteryLevel < 20) Color.Red else Text_Secondary,
-                    modifier = Modifier.size(width = 37.dp, height = 21.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-
-                // 배터리 퍼센트는 연결되고 값이 있을 때만 표시
-                if (isConnected && uiState.deviceBatteryLevel != null) {
-                    Text(
-                        text = "${uiState.deviceBatteryLevel}%",
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            fontSize = 8.sp,
-                            fontWeight = FontWeight.Medium
-                        ),
-                        color = if (uiState.deviceBatteryLevel < 20) Color.Red else Text_Secondary
-                    )
-                } else if (isConnected) {
-                    // 배터리 레벨 로딩 중
-                    Text(
-                        text = "연결중...",
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            fontSize = 8.sp,
-                            fontWeight = FontWeight.Medium
-                        ),
-                        color = Text_Secondary
-                    )
-                }
-            }
-
-            // Share button
-            IconButton(
-                onClick = onShareClick
-            ) {
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_camera),
-                    contentDescription = stringResource(id = R.string.share_description),
-                    tint = Purple_Medium,
-                    modifier = Modifier.size(width = 33.dp, height = 27.dp)
-                )
-            }
-        }
-    }
-}
-
-/**
- * BLE Device Picker Dialog
- * Shows available BLE devices for selection
- */
-@Composable
-private fun BleDevicePickerDialog(
-    devices: List<DeviceInfo>,
-    onDeviceSelected: (String) -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = "블루투스 기기 선택",
-                style = MaterialTheme.typography.headlineSmall,
-                color = Text_Primary
-            )
-        },
-        text = {
-            Column {
-                Text(
-                    text = "연결할 WISH RING 기기를 선택하세요",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Text_Secondary,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
-
-                LazyColumn {
-                    items(devices) { device ->
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp)
-                                .clickable { onDeviceSelected(device.address) },
-                            colors = CardDefaults.cardColors(
-                                containerColor = Color.White
-                            ),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                // Device icon
-                                Icon(
-                                    imageVector = Icons.Default.Circle,
-                                    contentDescription = null,
-                                    tint = Purple_Medium,
-                                    modifier = Modifier.size(12.dp)
-                                )
-
-                                Spacer(modifier = Modifier.width(12.dp))
-
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = device.name.takeIf { it.isNotBlank() }
-                                            ?: "Unknown Device",
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = Text_Primary,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                    Text(
-                                        text = device.address,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = Text_Secondary
-                                    )
-                                }
-
-                                // Signal strength
-                                Column(horizontalAlignment = Alignment.End) {
-                                    Text(
-                                        text = "${device.rssi} dBm",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = Text_Tertiary
-                                    )
-                                    // Signal strength bars
-                                    Row {
-                                        repeat(4) { index ->
-                                            val isActive = when {
-                                                device.rssi >= -50 -> index < 4
-                                                device.rssi >= -60 -> index < 3
-                                                device.rssi >= -70 -> index < 2
-                                                else -> index < 1
-                                            }
-                                            Box(
-                                                modifier = Modifier
-                                                    .width(3.dp)
-                                                    .height(((index + 1) * 3).dp)
-                                                    .background(
-                                                        if (isActive) Purple_Medium else Color.Gray.copy(
-                                                            alpha = 0.3f
-                                                        ),
-                                                        RoundedCornerShape(1.dp)
-                                                    )
-                                            )
-                                            if (index < 3) Spacer(modifier = Modifier.width(1.dp))
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(
-                    text = "취소",
-                    color = Text_Secondary
-                )
-            }
-        },
-        containerColor = Color.White,
-        modifier = Modifier.padding(16.dp)
-    )
 }
 
 

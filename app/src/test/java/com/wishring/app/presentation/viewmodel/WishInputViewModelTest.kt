@@ -2,7 +2,7 @@ package com.wishring.app.presentation.viewmodel
 
 import androidx.lifecycle.SavedStateHandle
 import com.wishring.app.data.model.WishUiState
-import com.wishring.app.data.repository.WishCountRepository
+import com.wishring.app.data.repository.WishRepository
 import com.wishring.app.data.repository.PreferencesRepository
 import com.wishring.app.presentation.wishinput.WishInputViewModel
 import com.wishring.app.presentation.wishinput.WishInputEvent
@@ -28,7 +28,7 @@ import java.time.LocalDate
 class WishInputViewModelTest {
 
     @MockK
-    private lateinit var wishCountRepository: WishCountRepository
+    private lateinit var wishRepository: WishRepository
     
     @MockK
     private lateinit var preferencesRepository: PreferencesRepository
@@ -49,13 +49,13 @@ class WishInputViewModelTest {
         every { savedStateHandle.set(any(), any<Any>()) } just Runs
         coEvery { preferencesRepository.getDefaultWishText() } returns ""
         coEvery { preferencesRepository.getDefaultTargetCount() } returns 1000
-        coEvery { wishCountRepository.getDailyRecord(any()) } returns null
-        coEvery { wishCountRepository.updateTodayWishAndTarget(any(), any()) } just Runs
-        coEvery { wishCountRepository.getWishCountByDate(any()) } returns null
-        coEvery { wishCountRepository.saveWishCount(any()) } just Runs
+        coEvery { wishRepository.getDailyRecord(any()) } returns null
+        coEvery { wishRepository.updateTodayWishAndTarget(any(), any()) } just Runs
+        coEvery { wishRepository.getWishCountByDate(any()) } returns null
+        coEvery { wishRepository.saveWishCount(any()) } just Runs
         
         viewModel = WishInputViewModel(
-            wishCountRepository = wishCountRepository,
+            wishRepository = wishRepository,
             preferencesRepository = preferencesRepository,
             savedStateHandle = savedStateHandle
         )
@@ -356,7 +356,7 @@ class WishInputViewModelTest {
             
             // Then
             coVerify { 
-                wishCountRepository.updateTodayWishAndTarget("매일 성장하는 나", 2000)
+                wishRepository.updateTodayWishAndTarget("매일 성장하는 나", 2000)
             }
             
             viewModel.effect.test {
@@ -401,7 +401,7 @@ class WishInputViewModelTest {
             
             // Then - Should save first valid wish
             coVerify { 
-                wishCountRepository.updateTodayWishAndTarget("첫 번째 유효한 위시", 1000)
+                wishRepository.updateTodayWishAndTarget("첫 번째 유효한 위시", 1000)
             }
         }
         
@@ -471,7 +471,7 @@ class WishInputViewModelTest {
                 wishText = "기존 위시",
                 currentCount = 1000
             )
-            coEvery { wishCountRepository.getWishCountByDate(today) } returns existingRecord
+            coEvery { wishRepository.getWishCountByDate(today) } returns existingRecord
             
             // When
             viewModel.onEvent(WishInputEvent.ConfirmDelete)
@@ -479,7 +479,7 @@ class WishInputViewModelTest {
             
             // Then
             coVerify { 
-                wishCountRepository.saveWishCount(
+                wishRepository.saveWishCount(
                     existingRecord.copy(targetCount = 0, wishText = "")
                 )
             }
@@ -562,11 +562,11 @@ class WishInputViewModelTest {
                 wishText = "기존 위시",
                 currentCount = 1500
             )
-            coEvery { wishCountRepository.getDailyRecord(today) } returns existingRecord
+            coEvery { wishRepository.getDailyRecord(today) } returns existingRecord
             
             // When
             viewModel = WishInputViewModel(
-                wishCountRepository = wishCountRepository,
+                wishRepository = wishRepository,
                 preferencesRepository = preferencesRepository,
                 savedStateHandle = savedStateHandle
             )
@@ -595,7 +595,7 @@ class WishInputViewModelTest {
                 wishText = "과거 위시",
                 currentCount = 2000
             )
-            coEvery { wishCountRepository.getDailyRecord(targetDate) } returns existingRecord
+            coEvery { wishRepository.getDailyRecord(targetDate) } returns existingRecord
             
             // When
             viewModel.onEvent(WishInputEvent.LoadExistingRecord(targetDate))
@@ -624,11 +624,11 @@ class WishInputViewModelTest {
                 wishText = "", // Empty text
                 currentCount = 1000
             )
-            coEvery { wishCountRepository.getDailyRecord(today) } returns emptyRecord
+            coEvery { wishRepository.getDailyRecord(today) } returns emptyRecord
             
             // When
             viewModel = WishInputViewModel(
-                wishCountRepository = wishCountRepository,
+                wishRepository = wishRepository,
                 preferencesRepository = preferencesRepository,
                 savedStateHandle = savedStateHandle
             )

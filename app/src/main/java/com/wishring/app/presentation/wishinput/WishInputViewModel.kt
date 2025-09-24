@@ -3,7 +3,7 @@ package com.wishring.app.presentation.wishinput
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.wishring.app.data.repository.WishCountRepository
+import com.wishring.app.data.repository.WishRepository
 import com.wishring.app.data.repository.PreferencesRepository
 import com.wishring.app.presentation.wishinput.model.WishItem
 import com.wishring.app.presentation.wishinput.model.toWishDataList
@@ -22,7 +22,7 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class WishInputViewModel @Inject constructor(
-    private val wishCountRepository: WishCountRepository,
+    private val wishRepository: WishRepository,
     private val preferencesRepository: PreferencesRepository,
     private val savedStateHandle: SavedStateHandle
 ) : ViewModel() {
@@ -84,8 +84,8 @@ class WishInputViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val today = LocalDate.now()
-                val todayWishes = wishCountRepository.getTodayWishes()
-                val todayWishCount = wishCountRepository.getTodayWishCount()
+                val todayWishes = wishRepository.getTodayWishes()
+                val todayWishCount = wishRepository.getTodayWish()
                 
                 if (todayWishes.isNotEmpty() && todayWishCount != null) {
                     // Convert existing wishes to WishItem list with shared target count
@@ -99,7 +99,7 @@ class WishInputViewModel @Inject constructor(
                     }
                 } else {
                     // Fallback to old single wish approach for backward compatibility
-                    val record = wishCountRepository.getDailyRecord(today.toString())
+                    val record = wishRepository.getDailyRecord(today.toString())
                     if (record != null && record.wishText.isNotBlank()) {
                         val existingWish = WishItem.create(record.wishText, record.targetCount)
                         _uiState.update { state ->
@@ -200,7 +200,7 @@ class WishInputViewModel @Inject constructor(
                     // Update repository with multiple wishes
                     // All wishes share the same target count from the first valid wish
                     val targetCount = validWishes.first().targetCount
-                    wishCountRepository.updateTodayWishesAndTarget(
+                    wishRepository.updateTodayWishesAndTarget(
                         wishesData = wishDataList,
                         targetCount = targetCount,
                         activeWishIndex = 0 // Default to first wish as active
@@ -260,9 +260,9 @@ class WishInputViewModel @Inject constructor(
             try {
                 // Clear today's wish by setting empty text and 0 count
                 val today = LocalDate.now().toString()
-                val existing = wishCountRepository.getWishCountByDate(today)
+                val existing = wishRepository.getWishCountByDate(today)
                 if (existing != null) {
-                    wishCountRepository.saveWishCount(existing.copy(targetCount = 0, wishText = ""))
+                    wishRepository.saveWishCount(existing.copy(targetCount = 0, wishText = ""))
                 }
                 
                 _effect.send(WishInputEffect.ShowToast("위시가 삭제되었습니다"))
@@ -304,7 +304,7 @@ class WishInputViewModel @Inject constructor(
                 // Try to get wishes for the specific date
                 // Note: This would need a new repository method getTodayWishes(date: String)
                 // For now, we'll use the existing getDailyRecord as fallback
-                val record = wishCountRepository.getDailyRecord(recordDate.toString())
+                val record = wishRepository.getDailyRecord(recordDate.toString())
                 if (record != null && record.wishText.isNotBlank()) {
                     val existingWish = WishItem.create(record.wishText, record.targetCount)
                     _uiState.update { state ->

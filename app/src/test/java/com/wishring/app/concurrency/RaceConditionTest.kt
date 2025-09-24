@@ -1,9 +1,8 @@
 package com.wishring.app.concurrency
 
 import com.wishring.app.data.local.dao.WishCountDao
-import com.wishring.app.data.local.entity.WishCountEntity
-import com.wishring.app.data.repository.WishCountRepositoryImpl
-import com.wishring.app.data.repository.WishCountRepository
+import com.wishring.app.data.local.database.dao.WishDao
+import com.wishring.app.data.repository.WishRepository
 import com.wishring.app.data.repository.PreferencesRepository
 import io.mockk.*
 import io.mockk.impl.annotations.MockK
@@ -18,13 +17,11 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.ints.shouldBeLessThanOrEqual
 import io.kotest.property.Arb
 import io.kotest.property.arbitrary.*
 import io.kotest.property.checkAll
-import java.time.LocalDate
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
@@ -34,12 +31,12 @@ import kotlin.random.Random
 class RaceConditionTest {
 
     @MockK
-    private lateinit var wishCountDao: WishCountDao
+    private lateinit var wishDao: WishDao
     
     @MockK
     private lateinit var preferencesRepository: PreferencesRepository
     
-    private lateinit var repository: WishCountRepository
+    private lateinit var repository: WishRepository
     private val testDispatcher = StandardTestDispatcher()
     
     @BeforeEach
@@ -69,7 +66,7 @@ class RaceConditionTest {
             val mutex = Mutex()
             
             // Mock repository with thread-safe implementation
-            val safeRepository = object : WishCountRepository {
+            val safeRepository = object : WishRepository {
                 override suspend fun incrementCount(amount: Int) {
                     mutex.withLock {
                         val current = atomicCounter.get()

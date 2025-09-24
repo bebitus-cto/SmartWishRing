@@ -6,7 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.wishring.app.data.model.ConnectedDevice
 import com.wishring.app.data.repository.BleConnectionState
 import com.wishring.app.data.repository.PreferencesRepository
-import com.wishring.app.data.repository.WishCountRepository
+import com.wishring.app.data.repository.WishRepository
 import com.wishring.app.data.ble.model.BleConstants
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,7 +16,6 @@ import javax.inject.Inject
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
-    private val wishCountRepository: WishCountRepository,
     private val preferencesRepository: PreferencesRepository
 ) : ViewModel() {
 
@@ -25,34 +24,11 @@ class MainViewModel @Inject constructor(
     private val _bleUiState = MutableStateFlow(BleUiState())
     val bleUiState = _bleUiState.asStateFlow()
 
-
-    init {
-        loadTodayCount()
-    }
-
-    private fun loadTodayCount() {
-        viewModelScope.launch {
-            try {
-                val todayWishCount = wishCountRepository.getTodayWishCount()
-                val count = todayWishCount?.targetCount ?: 0
-                _bleUiState.value = _bleUiState.value.copy(buttonCount = count)
-                Log.i(WR_EVENT, "[MainViewModel] 오늘 카운트 로드: $count")
-            } catch (e: Exception) {
-                Log.e(WR_EVENT, "[MainViewModel] 카운트 로드 실패", e)
-            }
-        }
-    }
-
     fun updateBatteryLevel(batteryLevel: Int) {
         _bleUiState.value = _bleUiState.value.copy(
             batteryLevel = batteryLevel,
         )
         Log.i(WR_EVENT, "[MainViewModel] 배터리 업데이트 - 레벨: ${batteryLevel}%")
-    }
-
-    fun updateButtonCount(count: Int) {
-        _bleUiState.value = _bleUiState.value.copy(buttonCount = count)
-        Log.i(WR_EVENT, "[MainViewModel] 버튼 카운트 업데이트: $count")
     }
 
     fun updateConnectionState(connected: Boolean) {
@@ -313,6 +289,6 @@ class MainViewModel @Inject constructor(
     }
 
     companion object {
-        private const val WR_EVENT = "WR_EVENT"
+        const val WR_EVENT = "WR_EVENT"
     }
 }

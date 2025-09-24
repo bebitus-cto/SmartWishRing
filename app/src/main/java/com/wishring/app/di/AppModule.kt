@@ -2,7 +2,7 @@ package com.wishring.app.di
 
 import android.content.Context
 import com.wishring.app.data.local.database.WishRingDatabase
-import com.wishring.app.data.local.database.dao.WishCountDao
+import com.wishring.app.data.local.database.dao.WishDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -64,7 +64,7 @@ object AppModule {
      * Provides WishCountDao
      */
     @Provides
-    fun provideWishCountDao(database: WishRingDatabase): WishCountDao {
+    fun provideWishDao(database: WishRingDatabase): WishDao {
         return database.wishDao()
     }
 }

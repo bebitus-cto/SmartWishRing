@@ -2,8 +2,8 @@ package com.wishring.app.di
 
 import com.wishring.app.data.repository.PreferencesRepository
 import com.wishring.app.data.repository.PreferencesRepositoryImpl
-import com.wishring.app.data.repository.WishCountRepository
-import com.wishring.app.data.repository.WishCountRepositoryImpl
+import com.wishring.app.data.repository.WishRepository
+import com.wishring.app.data.repository.WishRepositoryImpl
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -24,8 +24,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindWishCountRepository(
-        wishCountRepositoryImpl: WishCountRepositoryImpl
-    ): WishCountRepository
+        wishCountRepositoryImpl: WishRepositoryImpl
+    ): WishRepository
     
     /**
      * Binds PreferencesRepository implementation

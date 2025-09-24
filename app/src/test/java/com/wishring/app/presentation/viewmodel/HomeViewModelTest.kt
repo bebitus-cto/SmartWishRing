@@ -3,7 +3,7 @@ package com.wishring.app.presentation.viewmodel
 import android.content.Context
 import app.cash.turbine.test
 import com.wishring.app.data.model.WishUiState
-import com.wishring.app.data.repository.WishCountRepository
+import com.wishring.app.data.repository.WishRepository
 import com.wishring.app.data.repository.PreferencesRepository
 import com.wishring.app.data.repository.BleRepository
 import com.wishring.app.data.repository.BleConnectionState
@@ -30,7 +30,7 @@ class HomeViewModelTest {
     private lateinit var context: Context
     
     @MockK
-    private lateinit var wishCountRepository: WishCountRepository
+    private lateinit var wishRepository: WishRepository
     
     @MockK
     private lateinit var preferencesRepository: PreferencesRepository
@@ -89,10 +89,10 @@ class HomeViewModelTest {
             val totalCount = 500
             val activeIndex = 1
             
-            coEvery { wishCountRepository.getTodayWishes() } returns wishData
-            coEvery { wishCountRepository.getActiveWishIndex() } returns activeIndex
+            coEvery { wishRepository.getTodayWishes() } returns wishData
+            coEvery { wishRepository.getActiveWishIndex() } returns activeIndex
             val mockWishUiState = WishUiState.createDefault().copy(targetCount = totalCount)
-            coEvery { wishCountRepository.getTodayWishCount() } returns mockWishUiState
+            coEvery { wishRepository.getTodayWish() } returns mockWishUiState
             
             // When
             viewModel = createViewModel()
@@ -113,7 +113,7 @@ class HomeViewModelTest {
         @DisplayName("데이터 로드 에러 처리")
         fun `should handle loading error`() = runTest {
             // Given
-            coEvery { wishCountRepository.getTodayWishes() } throws RuntimeException("Database error")
+            coEvery { wishRepository.getTodayWishes() } throws RuntimeException("Database error")
             
             // When
             viewModel = createViewModel()
@@ -167,7 +167,7 @@ class HomeViewModelTest {
             // Given
             val counterFlow = MutableSharedFlow<Int>()
             every { bleRepository.counterIncrements } returns counterFlow
-            coEvery { wishCountRepository.incrementTodayCount(any()) } returns WishUiState.createDefault()
+            coEvery { wishRepository.incrementTodayCount(any()) } returns WishUiState.createDefault()
             
             // When
             viewModel = createViewModel()
@@ -178,7 +178,7 @@ class HomeViewModelTest {
             testDispatcher.scheduler.advanceUntilIdle()
             
             // Then - Repository should be called
-            coVerify { wishCountRepository.incrementTodayCount(1) }
+            coVerify { wishRepository.incrementTodayCount(1) }
         }
         
         @Test
@@ -224,9 +224,9 @@ class HomeViewModelTest {
                 WishData("위시 3", 3000)
             )
             
-            coEvery { wishCountRepository.getTodayWishes() } returns wishData
-            coEvery { wishCountRepository.getActiveWishIndex() } returns 0
-            coEvery { wishCountRepository.setActiveWishIndex(any()) } returns WishUiState.createDefault()
+            coEvery { wishRepository.getTodayWishes() } returns wishData
+            coEvery { wishRepository.getActiveWishIndex() } returns 0
+            coEvery { wishRepository.setActiveWishIndex(any()) } returns WishUiState.createDefault()
             
             viewModel = createViewModel()
             testDispatcher.scheduler.advanceUntilIdle()
@@ -236,7 +236,7 @@ class HomeViewModelTest {
             testDispatcher.scheduler.advanceUntilIdle()
             
             // Then
-            coVerify { wishCountRepository.setActiveWishIndex(1) }
+            coVerify { wishRepository.setActiveWishIndex(1) }
         }
         
         @Test
@@ -249,9 +249,9 @@ class HomeViewModelTest {
                 WishData("위시 3", 3000)
             )
             
-            coEvery { wishCountRepository.getTodayWishes() } returns wishData
-            coEvery { wishCountRepository.getActiveWishIndex() } returns 2 // 마지막 위시
-            coEvery { wishCountRepository.setActiveWishIndex(any()) } returns WishUiState.createDefault()
+            coEvery { wishRepository.getTodayWishes() } returns wishData
+            coEvery { wishRepository.getActiveWishIndex() } returns 2 // 마지막 위시
+            coEvery { wishRepository.setActiveWishIndex(any()) } returns WishUiState.createDefault()
             
             viewModel = createViewModel()
             testDispatcher.scheduler.advanceUntilIdle()
@@ -261,7 +261,7 @@ class HomeViewModelTest {
             testDispatcher.scheduler.advanceUntilIdle()
             
             // Then
-            coVerify { wishCountRepository.setActiveWishIndex(1) }
+            coVerify { wishRepository.setActiveWishIndex(1) }
         }
         
         @Test
@@ -274,9 +274,9 @@ class HomeViewModelTest {
                 WishData("위시 3", 3000)
             )
             
-            coEvery { wishCountRepository.getTodayWishes() } returns wishData
-            coEvery { wishCountRepository.getActiveWishIndex() } returns 0
-            coEvery { wishCountRepository.setActiveWishIndex(any()) } returns WishUiState.createDefault()
+            coEvery { wishRepository.getTodayWishes() } returns wishData
+            coEvery { wishRepository.getActiveWishIndex() } returns 0
+            coEvery { wishRepository.setActiveWishIndex(any()) } returns WishUiState.createDefault()
             
             viewModel = createViewModel()
             testDispatcher.scheduler.advanceUntilIdle()
@@ -286,7 +286,7 @@ class HomeViewModelTest {
             testDispatcher.scheduler.advanceUntilIdle()
             
             // Then
-            coVerify { wishCountRepository.setActiveWishIndex(2) }
+            coVerify { wishRepository.setActiveWishIndex(2) }
         }
         
         @ParameterizedTest
@@ -296,9 +296,9 @@ class HomeViewModelTest {
             // Given
             val wishData = (1..3).map { WishData("위시 $it", it * 1000) }
             
-            coEvery { wishCountRepository.getTodayWishes() } returns wishData
-            coEvery { wishCountRepository.getActiveWishIndex() } returns 0
-            coEvery { wishCountRepository.setActiveWishIndex(any()) } returns WishUiState.createDefault()
+            coEvery { wishRepository.getTodayWishes() } returns wishData
+            coEvery { wishRepository.getActiveWishIndex() } returns 0
+            coEvery { wishRepository.setActiveWishIndex(any()) } returns WishUiState.createDefault()
             
             viewModel = createViewModel()
             testDispatcher.scheduler.advanceUntilIdle()
@@ -308,7 +308,7 @@ class HomeViewModelTest {
             testDispatcher.scheduler.advanceUntilIdle()
             
             // Then
-            coVerify { wishCountRepository.setActiveWishIndex(index) }
+            coVerify { wishRepository.setActiveWishIndex(index) }
         }
     }
     
@@ -326,9 +326,9 @@ class HomeViewModelTest {
                 WishData("위시 2", 2000)
             )
             
-            coEvery { wishCountRepository.getTodayWishes() } returnsMany listOf(initialWishes, refreshedWishes)
-            coEvery { wishCountRepository.getActiveWishIndex() } returns 0
-            coEvery { wishCountRepository.getTodayWishCount() } returns WishUiState.createDefault()
+            coEvery { wishRepository.getTodayWishes() } returnsMany listOf(initialWishes, refreshedWishes)
+            coEvery { wishRepository.getActiveWishIndex() } returns 0
+            coEvery { wishRepository.getTodayWish() } returns WishUiState.createDefault()
             
             viewModel = createViewModel()
             testDispatcher.scheduler.advanceUntilIdle()
@@ -385,9 +385,9 @@ class HomeViewModelTest {
             val wishData = listOf(WishData("위시", targetCount))
             val wishUiState = WishUiState.createDefault().copy(targetCount = totalCount)
             
-            coEvery { wishCountRepository.getTodayWishes() } returns wishData
-            coEvery { wishCountRepository.getActiveWishIndex() } returns 0
-            coEvery { wishCountRepository.getTodayWishCount() } returns wishUiState
+            coEvery { wishRepository.getTodayWishes() } returns wishData
+            coEvery { wishRepository.getActiveWishIndex() } returns 0
+            coEvery { wishRepository.getTodayWish() } returns wishUiState
             
             // When
             viewModel = createViewModel()
@@ -449,21 +449,20 @@ class HomeViewModelTest {
     private fun createViewModel(): HomeViewModel {
         return HomeViewModel(
             context = context,
-            wishCountRepository = wishCountRepository,
-            bleRepository = bleRepository,
-            preferencesRepository = preferencesRepository
+            wishRepository = wishRepository,
+            bleRepository = bleRepository
         )
     }
     
     private fun setupDefaultMocks() {
         // WishCountRepository mocks
-        coEvery { wishCountRepository.getTodayWishes() } returns emptyList()
-        coEvery { wishCountRepository.getActiveWishIndex() } returns 0
-        coEvery { wishCountRepository.getTodayWishCount() } returns WishUiState.createDefault()
-        coEvery { wishCountRepository.getDailyRecords(any()) } returns emptyList()
-        coEvery { wishCountRepository.getStreakInfo() } returns StreakInfo(0, 0, null, null, false)
-        coEvery { wishCountRepository.setActiveWishIndex(any()) } returns WishUiState.createDefault()
-        coEvery { wishCountRepository.incrementTodayCount(any()) } returns WishUiState.createDefault()
+        coEvery { wishRepository.getTodayWishes() } returns emptyList()
+        coEvery { wishRepository.getActiveWishIndex() } returns 0
+        coEvery { wishRepository.getTodayWish() } returns WishUiState.createDefault()
+        coEvery { wishRepository.getDailyRecords(any()) } returns emptyList()
+        coEvery { wishRepository.getStreakInfo() } returns StreakInfo(0, 0, null, null, false)
+        coEvery { wishRepository.setActiveWishIndex(any()) } returns WishUiState.createDefault()
+        coEvery { wishRepository.incrementTodayCount(any()) } returns WishUiState.createDefault()
         
         // BleRepository mocks
         every { bleRepository.getConnectionState() } returns flowOf(BleConnectionState.DISCONNECTED)

@@ -15,11 +15,9 @@ import androidx.compose.ui.res.painterResource
 import com.wishring.app.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.wishring.app.ui.theme.*
-import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 @Composable
@@ -27,7 +25,6 @@ fun WishReportItem(
     wishText: String,
     date: String,
     count: Int,
-    isCompleted: Boolean = false,
     onClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {

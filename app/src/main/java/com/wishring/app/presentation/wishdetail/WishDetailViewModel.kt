@@ -3,7 +3,7 @@ package com.wishring.app.presentation.wishdetail
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.wishring.app.data.repository.WishCountRepository
+import com.wishring.app.data.repository.WishRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,7 +22,7 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class WishDetailViewModel @Inject constructor(
-    private val wishCountRepository: WishCountRepository,
+    private val wishRepository: WishRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -69,7 +69,7 @@ class WishDetailViewModel @Inject constructor(
 
             try {
                 val dateString = date.format(DateTimeFormatter.ISO_LOCAL_DATE)
-                val dailyRecord = wishCountRepository.getDailyRecord(dateString)
+                val dailyRecord = wishRepository.getDailyRecord(dateString)
 
                 _uiState.update { state ->
                     state.copy(

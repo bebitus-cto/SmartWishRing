@@ -1,7 +1,7 @@
 package com.wishring.app.data.repository
 
 import com.wishring.app.core.util.DateUtils
-import com.wishring.app.data.local.database.dao.WishCountDao
+import com.wishring.app.data.local.database.dao.WishDao
 import com.wishring.app.data.local.database.entity.WishEntity
 import com.wishring.app.data.local.database.entity.WishData
 import com.wishring.app.data.model.DailyRecord
@@ -19,14 +19,14 @@ import javax.inject.Singleton
  * Manages WishCount data operations using Room DAO directly
  */
 @Singleton
-class WishCountRepositoryImpl @Inject constructor(
-    private val wishCountDao: WishCountDao,
+class WishRepositoryImpl @Inject constructor(
+    private val wishDao: WishDao,
     private val preferencesRepository: PreferencesRepository
-) : WishCountRepository {
+) : WishRepository {
 
-    override suspend fun getTodayWishCount(): WishUiState? {
+    override suspend fun getTodayWish(): WishUiState? {
         val today = DateUtils.getTodayString()
-        val existingCount = wishCountDao.getByDate(today)
+        val existingCount = wishDao.getByDate(today)
 
         // Return null if no wish exists for today (don't create default)
         return existingCount?.let {
@@ -35,11 +35,11 @@ class WishCountRepositoryImpl @Inject constructor(
     }
 
     override suspend fun getWishCountByDate(date: String): WishUiState? {
-        return wishCountDao.getByDate(date)?.let { WishUiState.fromEntity(it) }
+        return wishDao.getByDate(date)?.let { WishUiState.fromEntity(it) }
     }
 
     override fun getAllWishCounts(): Flow<List<WishUiState>> {
-        return wishCountDao.getAllRecords().map { entities ->
+        return wishDao.getAllRecords().map { entities ->
             entities.map { WishUiState.fromEntity(it) }
         }
     }
@@ -48,19 +48,19 @@ class WishCountRepositoryImpl @Inject constructor(
         startDate: String,
         endDate: String
     ): List<WishUiState> {
-        return wishCountDao.getRecordsBetween(startDate, endDate).map {
+        return wishDao.getRecordsBetween(startDate, endDate).map {
             WishUiState.fromEntity(it)
         }
     }
 
     override suspend fun getRecentWishCounts(limit: Int): List<WishUiState> {
-        return wishCountDao.getRecentRecords(limit).first().map { entity ->
+        return wishDao.getRecentRecords(limit).first().map { entity ->
             WishUiState.fromEntity(entity)
         }
     }
 
     override suspend fun getDailyRecords(limit: Int): List<DailyRecord> {
-        val wishCounts = wishCountDao.getRecentRecords(limit).first()
+        val wishCounts = wishDao.getRecentRecords(limit).first()
         return wishCounts.map { entity ->
             val wishUiState = WishUiState.fromEntity(entity)
             DailyRecord.fromWishCount(wishUiState)
@@ -96,7 +96,7 @@ class WishCountRepositoryImpl @Inject constructor(
             val dateString = date.toString()
 
             // Skip if data already exists for this date
-            val existing = wishCountDao.getByDate(dateString)
+            val existing = wishDao.getByDate(dateString)
             if (existing != null) continue
 
             // Create random wish data
@@ -119,7 +119,7 @@ class WishCountRepositoryImpl @Inject constructor(
                 isCompleted = isCompleted
             )
 
-            wishCountDao.insert(entity)
+            wishDao.insert(entity)
         }
     }
 
@@ -129,7 +129,7 @@ class WishCountRepositoryImpl @Inject constructor(
      */
     suspend fun getOrCreateTodayWishCount(): WishUiState {
         val today = DateUtils.getTodayString()
-        val existingCount = wishCountDao.getByDate(today)
+        val existingCount = wishDao.getByDate(today)
 
         return if (existingCount != null) {
             WishUiState.fromEntity(existingCount)
@@ -141,115 +141,46 @@ class WishCountRepositoryImpl @Inject constructor(
                 date = today,
                 wishText = defaultWishText
             )
-            wishCountDao.insert(newCount.toEntity())
+            wishDao.insert(newCount.toEntity())
             newCount
         }
     }
 
     override suspend fun getDailyRecord(date: String): DailyRecord? {
-        val wishUiState = wishCountDao.getByDate(date)?.let { WishUiState.fromEntity(it) }
+        val wishUiState = wishDao.getByDate(date)?.let { WishUiState.fromEntity(it) }
             ?: return null
 
         return DailyRecord.fromWishCount(wishUiState)
     }
 
     override suspend fun saveWishCount(wishUiState: WishUiState): WishUiState {
-        val id = wishCountDao.insert(wishUiState.toEntity())
+        val id = wishDao.insert(wishUiState.toEntity())
         return wishUiState
     }
 
     override suspend fun isTodayCompleted(): Boolean {
         val today = DateUtils.getTodayString()
-        val entity = wishCountDao.getByDate(today)
+        val entity = wishDao.getByDate(today)
         return entity?.isCompleted == true
     }
 
-    override suspend fun getStreakInfo(): StreakInfo {
-        val allCounts = wishCountDao.getAllRecordsSync()
-            .sortedByDescending { it.date }
-
-        if (allCounts.isEmpty()) {
-            return StreakInfo(
-                currentStreak = 0,
-                bestStreak = 0,
-                lastActiveDate = null,
-                streakStartDate = null,
-                isActiveToday = false
-            )
-        }
-
-        val today = DateUtils.getTodayString()
-        val isActiveToday = allCounts.any { it.date == today && it.totalCount > 0 }
-
-        // Calculate current streak
-        var currentStreak = 0
-        var currentDate = LocalDate.now()
-        var streakStartDate: String? = null
-
-        for (i in 0 until 365) { // Check up to 1 year
-            val dateStr = currentDate.toString()
-            val dayCount = allCounts.find { it.date == dateStr }
-
-            if (dayCount != null && dayCount.totalCount > 0) {
-                currentStreak++
-                streakStartDate = dateStr
-                currentDate = currentDate.minusDays(1)
-            } else if (i == 0 && !isActiveToday) {
-                // Today is not active, check from yesterday
-                currentDate = currentDate.minusDays(1)
-            } else {
-                break
-            }
-        }
-
-        // Calculate best streak
-        var bestStreak = currentStreak
-        var tempStreak = 0
-        val sortedDates = allCounts.filter { it.totalCount > 0 }
-            .map { LocalDate.parse(it.date) }
-            .sorted()
-
-        if (sortedDates.isNotEmpty()) {
-            tempStreak = 1
-            for (i in 1 until sortedDates.size) {
-                val dayDiff = sortedDates[i].toEpochDay() - sortedDates[i - 1].toEpochDay()
-                if (dayDiff == 1L) {
-                    tempStreak++
-                    bestStreak = maxOf(bestStreak, tempStreak)
-                } else {
-                    tempStreak = 1
-                }
-            }
-        }
-
-        val lastActiveDate = allCounts.firstOrNull { it.totalCount > 0 }?.date
-
-        return StreakInfo(
-            currentStreak = currentStreak,
-            bestStreak = bestStreak,
-            lastActiveDate = lastActiveDate,
-            streakStartDate = streakStartDate,
-            isActiveToday = isActiveToday
-        )
-    }
-
     override suspend fun deleteWishCount(date: String): Boolean {
-        return wishCountDao.deleteWishCount(date) > 0
+        return wishDao.deleteWishCount(date) > 0
     }
 
     override suspend fun deleteOldRecords(beforeDate: String): Int {
-        return wishCountDao.deleteOlderThan(beforeDate)
+        return wishDao.deleteOlderThan(beforeDate)
     }
 
     override fun observeTodayWishCount(): Flow<WishUiState?> {
         val today = DateUtils.getTodayString()
-        return wishCountDao.observeByDate(today).map { entity ->
+        return wishDao.observeByDate(today).map { entity ->
             entity?.let { WishUiState.fromEntity(it) }
         }
     }
 
     override fun observeRecentWishCounts(limit: Int): Flow<List<WishUiState>> {
-        return wishCountDao.getRecentRecords(limit).map { entities ->
+        return wishDao.getRecentRecords(limit).map { entities ->
             entities.map { WishUiState.fromEntity(it) }
         }
     }
@@ -260,7 +191,7 @@ class WishCountRepositoryImpl @Inject constructor(
         activeWishIndex: Int
     ): WishUiState {
         val today = DateUtils.getTodayString()
-        val existing = wishCountDao.getByDate(today)
+        val existing = wishDao.getByDate(today)
 
         val updatedEntity = existing?.updateWishes(
             wishesData,
@@ -273,32 +204,32 @@ class WishCountRepositoryImpl @Inject constructor(
             date = today
         )
 
-        wishCountDao.insert(updatedEntity)
+        wishDao.insert(updatedEntity)
         return WishUiState.fromEntity(updatedEntity)
     }
 
     override suspend fun setActiveWishIndex(index: Int): WishUiState {
         val today = DateUtils.getTodayString()
-        val existing = wishCountDao.getByDate(today)
+        val existing = wishDao.getByDate(today)
             ?: throw IllegalStateException("No wish count found for today")
 
         val wishes = existing.parseWishes()
         val validIndex = index.coerceIn(0, wishes.size - 1)
         val updatedEntity = existing.updateWishes(wishes, validIndex)
 
-        wishCountDao.insert(updatedEntity)
+        wishDao.insert(updatedEntity)
         return WishUiState.fromEntity(updatedEntity)
     }
 
     override suspend fun getActiveWishIndex(): Int {
         val today = DateUtils.getTodayString()
-        val existing = wishCountDao.getByDate(today)
+        val existing = wishDao.getByDate(today)
         return existing?.activeWishIndex ?: 0
     }
 
     override suspend fun getTodayWishes(): List<WishData> {
         val today = DateUtils.getTodayString()
-        val existing = wishCountDao.getByDate(today)
+        val existing = wishDao.getByDate(today)
         return existing?.parseWishes() ?: emptyList()
     }
 }

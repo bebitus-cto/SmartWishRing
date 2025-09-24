@@ -83,14 +83,6 @@ sealed class HomeEffect {
     ) : HomeEffect()
     
     /**
-     * Show streak details dialog
-     * @param streakInfo Streak information
-     */
-    data class ShowStreakDetailsDialog(
-        val streakInfo: StreakDetailsInfo
-    ) : HomeEffect()
-    
-    /**
      * Request permission
      * @param permissionType Type of permission to request
      */
@@ -233,33 +225,4 @@ enum class PermissionType {
     NOTIFICATION,
     LOCATION
 }
-
-/**
- * Streak details info
- */
-data class StreakDetailsInfo(
-    val currentStreak: Int,
-    val bestStreak: Int,
-    val streakHistory: List<StreakPeriod>,
-    val achievements: List<StreakAchievement>
-)
-
-/**
- * Streak period data
- */
-data class StreakPeriod(
-    val startDate: String,
-    val endDate: String,
-    val days: Int
-)
-
-/**
- * Streak achievement data
- */
-data class StreakAchievement(
-    val title: String,
-    val description: String,
-    val iconRes: Int,
-    val isUnlocked: Boolean
-)
 

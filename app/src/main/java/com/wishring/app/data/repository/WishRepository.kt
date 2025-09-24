@@ -9,13 +9,13 @@ import kotlinx.coroutines.flow.Flow
  * Repository interface for WishCount domain operations
  * Defines contract between domain and data layers
  */
-interface WishCountRepository {
+interface WishRepository {
 
     /**
      * Get today's wish count
      * Creates new record if doesn't exist
      */
-    suspend fun getTodayWishCount(): WishUiState?
+    suspend fun getTodayWish(): WishUiState?
 
     /**
      * Get wish count for specific date
@@ -90,12 +90,6 @@ interface WishCountRepository {
     suspend fun isTodayCompleted(): Boolean
 
     /**
-     * Get streak information
-     * @return StreakInfo with current and best streaks
-     */
-    suspend fun getStreakInfo(): StreakInfo
-
-    /**
      * Delete wish count
      * @param date Date of record to delete
      * @return True if deleted
@@ -129,29 +123,3 @@ interface WishCountRepository {
 
     suspend fun getRecentWishCounts(limit: Int): List<WishUiState>
 }
-
-/**
- * Statistics data class
- */
-data class WishCountStatistics(
-    val totalDays: Int,
-    val completedDays: Int,
-    val totalCount: Int,
-    val totalTarget: Int,
-    val averageCount: Float,
-    val averageTarget: Float,
-    val completionRate: Float,
-    val bestDay: WishUiState?,
-    val worstDay: WishUiState?
-)
-
-/**
- * Streak information data class
- */
-data class StreakInfo(
-    val currentStreak: Int,
-    val bestStreak: Int,
-    val lastActiveDate: String?,
-    val streakStartDate: String?,
-    val isActiveToday: Boolean
-)
