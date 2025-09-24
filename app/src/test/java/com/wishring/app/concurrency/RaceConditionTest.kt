@@ -3,8 +3,8 @@ package com.wishring.app.concurrency
 import com.wishring.app.data.local.dao.WishCountDao
 import com.wishring.app.data.local.entity.WishCountEntity
 import com.wishring.app.data.repository.WishCountRepositoryImpl
-import com.wishring.app.domain.repository.WishCountRepository
-import com.wishring.app.domain.repository.PreferencesRepository
+import com.wishring.app.data.repository.WishCountRepository
+import com.wishring.app.data.repository.PreferencesRepository
 import io.mockk.*
 import io.mockk.impl.annotations.MockK
 import kotlinx.coroutines.*

@@ -35,18 +35,6 @@ sealed class WishInputEvent {
     data class UpdateWishCount(val wishId: UUID, val count: Int) : WishInputEvent()
     
     /**
-     * Select suggested wish
-     * @param wish Suggested wish text
-     */
-    data class SelectSuggestedWish(val wish: String) : WishInputEvent()
-    
-    /**
-     * Toggle suggestions visibility
-     */
-    object ToggleSuggestions : WishInputEvent()
-    
-    
-    /**
      * Save wish
      */
     object SaveWish : WishInputEvent()

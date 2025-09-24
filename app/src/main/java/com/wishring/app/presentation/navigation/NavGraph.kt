@@ -2,6 +2,7 @@ package com.wishring.app.presentation.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -13,6 +14,7 @@ import com.wishring.app.presentation.home.HomeScreen
 import com.wishring.app.presentation.splash.SplashScreen
 
 import com.wishring.app.presentation.wishinput.WishInputScreen
+import com.wishring.app.presentation.main.MainViewModel
 
 /**
  * Navigation graph for the app
@@ -21,7 +23,8 @@ import com.wishring.app.presentation.wishinput.WishInputScreen
 fun WishRingNavGraph(
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
-    startDestination: String = Screen.Splash.route
+    startDestination: String = Screen.Splash.route,
+    mainViewModel: MainViewModel = hiltViewModel<MainViewModel>()
 ) {
     NavHost(
         navController = navController,
@@ -38,7 +41,7 @@ fun WishRingNavGraph(
                 }
             )
         }
-        
+
         // Home screen
         composable(route = Screen.Home.route) {
             HomeScreen(
@@ -47,10 +50,11 @@ fun WishRingNavGraph(
                 },
                 onNavigateToWishInput = {
                     navController.navigate(Screen.WishInput.route)
-                }
+                },
+                mainViewModel = mainViewModel
             )
         }
-        
+
         // Detail screen with date parameter
         composable(
             route = Screen.Detail.route,
@@ -70,7 +74,7 @@ fun WishRingNavGraph(
                 }
             )
         }
-        
+
         // Wish input screen
         composable(route = Screen.WishInput.route) {
             WishInputScreen(
@@ -94,7 +98,7 @@ sealed class Screen(val route: String) {
     object Splash : Screen("splash")
     object Home : Screen("home")
     object WishInput : Screen("wish_input")
-    
+
     object Detail : Screen("detail?date={date}") {
         const val ARG_DATE = "date"
         fun createRoute(date: String? = null): String {

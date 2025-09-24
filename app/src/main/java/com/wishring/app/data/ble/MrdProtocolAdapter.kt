@@ -1,7 +1,7 @@
 package com.wishring.app.data.ble
 
-import com.wishring.app.domain.repository.BleConnectionState
-import com.wishring.app.domain.repository.BleDevice
+import com.wishring.app.data.repository.BleConnectionState
+import com.wishring.app.data.repository.BleDevice
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -53,8 +53,8 @@ class MrdProtocolAdapter @Inject constructor() {
     /**
      * Convert MRD reset event to domain model
      */
-    fun convertResetEvent(resetEvent: ResetEvent): com.wishring.app.domain.model.ResetEvent {
-        return com.wishring.app.domain.model.ResetEvent(
+    fun convertResetEvent(resetEvent: ResetEvent): com.wishring.app.data.model.ResetEvent {
+        return com.wishring.app.data.model.ResetEvent(
             timestamp = resetEvent.timestamp,
             previousCount = resetEvent.previousCount,
             deviceInfo = "WISH RING"
@@ -64,7 +64,7 @@ class MrdProtocolAdapter @Inject constructor() {
     /**
      * Convert MRD reset event Flow to domain Flow
      */
-    fun convertResetEventFlow(resetFlow: Flow<ResetEvent>): Flow<com.wishring.app.domain.model.ResetEvent> {
+    fun convertResetEventFlow(resetFlow: Flow<ResetEvent>): Flow<com.wishring.app.data.model.ResetEvent> {
         return resetFlow.map { convertResetEvent(it) }
     }
     

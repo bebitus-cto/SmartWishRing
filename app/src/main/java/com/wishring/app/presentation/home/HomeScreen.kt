@@ -1,5 +1,6 @@
 package com.wishring.app.presentation.home
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
@@ -29,7 +30,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -50,28 +50,23 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.Lifecycle
 import com.wishring.app.R
-import com.wishring.app.domain.model.DailyRecord
-import com.wishring.app.domain.model.WishCount
-import com.wishring.app.domain.repository.BleConnectionState
+import com.wishring.app.data.model.DailyRecord
 import com.wishring.app.presentation.component.CircularProgress
 import com.wishring.app.presentation.component.WishCard
-import com.wishring.app.presentation.home.component.WishReportItem
 import com.wishring.app.ui.theme.Purple_Medium
 import com.wishring.app.ui.theme.Purple_Primary
 import com.wishring.app.ui.theme.Text_Primary
 import com.wishring.app.ui.theme.Text_Secondary
 import com.wishring.app.ui.theme.Text_Tertiary
-import com.wishring.app.ui.theme.WishRingTheme
-import java.time.LocalDate
 import com.wishring.app.presentation.components.ShareDialog
 import com.wishring.app.presentation.components.PermissionExplanationDialog
 import com.wishring.app.presentation.components.PermissionDeniedDialog
@@ -80,6 +75,13 @@ import com.wishring.app.core.util.ShareUtils
 import com.wishring.app.MainActivity
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.platform.LocalContext
+import com.wishring.app.data.repository.BleConnectionState
+import com.wishring.app.presentation.main.MainViewModel
+import com.wishring.app.presentation.main.AutoConnectResult
+import com.wishring.app.presentation.main.DeviceInfo
+
+// Logging tag for event tracking
+private const val WR_EVENT = "WR_EVENT"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -87,12 +89,72 @@ fun HomeScreen(
     onNavigateToDetail: (String) -> Unit,
     onNavigateToWishInput: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: HomeViewModel = hiltViewModel()
+    viewModel: HomeViewModel = hiltViewModel(),
+    mainViewModel: MainViewModel = hiltViewModel<MainViewModel>()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val effect by viewModel.effect.collectAsStateWithLifecycle(null)
     val context = LocalContext.current
-    
+
+    val mainBleState by mainViewModel.bleUiState.collectAsStateWithLifecycle()
+    val mainBatteryLevel = mainBleState.batteryLevel
+    val isConnected = mainBleState.isConnected
+    val scannedDevices = mainBleState.scannedDevices
+    val showDevicePicker = mainBleState.shouldShowDevicePicker
+
+    // 배터리 상태 변경 감지 및 HomeViewModel 업데이트
+    LaunchedEffect(mainBatteryLevel) {
+        viewModel.onEvent(HomeEvent.UpdateBatteryLevel(mainBatteryLevel))
+    }
+
+    // BLE 연결 상태 동기화 (백그라운드 복귀 대응)
+    LaunchedEffect(isConnected) {
+        if (isConnected) {
+            // 연결 성공 시 연결 시도 완료 처리
+            viewModel.onEvent(HomeEvent.ConnectionAttemptCompleted)
+        }
+    }
+
+    // 앱 라이프사이클 변화 감지 (백그라운드 복귀 시 상태 확인)
+    val lifecycle = androidx.compose.ui.platform.LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            // 앱이 포그라운드로 복귀할 때마다 연결 상태 확인
+            viewModel.checkConnectionState()
+
+            // 실제 연결 상태를 확인해서 동기화
+            val actualState = if (isConnected) {
+                BleConnectionState.CONNECTED
+            } else {
+                BleConnectionState.DISCONNECTED
+            }
+            viewModel.syncConnectionState(actualState)
+        }
+    }
+
+    // 배터리 상태 변경 감지 디버깅
+    LaunchedEffect(uiState.deviceBatteryLevel, isConnected) {
+        Log.i(WR_EVENT, "[BATTERY_DEBUG] ===== HomeScreen 배터리 상태 변경 =====")
+        Log.i(WR_EVENT, "[BATTERY_DEBUG] 연결 상태: $isConnected")
+        Log.i(WR_EVENT, "[BATTERY_DEBUG] 배터리 레벨: ${uiState.deviceBatteryLevel}")
+        Log.i(WR_EVENT, "[BATTERY_DEBUG] UI 표시 조건: $isConnected")
+        Log.i(WR_EVENT, "[BATTERY_DEBUG] =========================================")
+    }
+
+//    // 상태 변경 감지를 위한 LaunchedEffect 추가
+//    LaunchedEffect(showDevicePicker, scannedDevices.size) {
+//        Log.d(WR_EVENT, "[HomeScreen] ===== MainViewModel 상태 변경 감지 =====")
+//        Log.d(WR_EVENT, "[HomeScreen] - showDevicePicker: $showDevicePicker")
+//        Log.d(WR_EVENT, "[HomeScreen] - scannedDevices 크기: ${scannedDevices.size}")
+//        if (scannedDevices.isNotEmpty()) {
+//            Log.d(WR_EVENT, "[HomeScreen] - 첫 번째 기기: ${scannedDevices.first().name}")
+//        }
+//        Log.d(WR_EVENT, "[HomeScreen] ========================================")
+//    }
+
+    // Get MainActivity instance
+    val activity = context as? MainActivity
+
     // Handle navigation effects
     LaunchedEffect(effect) {
         effect?.let { navigationEffect ->
@@ -100,6 +162,7 @@ fun HomeScreen(
                 is HomeEffect.NavigateToDetail -> {
                     onNavigateToDetail(navigationEffect.date)
                 }
+
                 HomeEffect.NavigateToWishInput -> {
                     onNavigateToWishInput()
                 }
@@ -112,81 +175,128 @@ fun HomeScreen(
                         hashtags = navigationEffect.hashtags
                     )
                 }
+
                 HomeEffect.EnableBluetooth -> {
                     // 블루투스 활성화 시스템 다이얼로그 표시
-                    val enableBtIntent = android.content.Intent(android.bluetooth.BluetoothAdapter.ACTION_REQUEST_ENABLE)
+                    val enableBtIntent =
+                        android.content.Intent(android.bluetooth.BluetoothAdapter.ACTION_REQUEST_ENABLE)
                     context.startActivity(enableBtIntent)
                 }
-                
+
                 HomeEffect.RequestBluetoothPermissions -> {
-                    // MainActivity에서 권한 요청 실행
+                    // MainActivity에서 BLE 스캔 시작 (권한 체크 포함)
                     val activity = context as? ComponentActivity
                     if (activity is MainActivity) {
-                        activity.requestBluetoothPermissions()
+                        activity.startBleScan()
                     } else {
-                        android.widget.Toast.makeText(context, "권한 요청 실패", android.widget.Toast.LENGTH_SHORT).show()
+                        android.widget.Toast.makeText(
+                            context,
+                            "권한 요청 실패",
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
                     }
                 }
-                
+
                 is HomeEffect.ShowPermissionExplanation -> {
                     // 권한 설명 다이얼로그 표시 - UI에서 처리됨
                 }
-                
+
                 is HomeEffect.ShowPermissionDenied -> {
                     // 권한 거부 안내 다이얼로그 표시 - UI에서 처리됨  
                 }
-                
+
                 HomeEffect.OpenAppSettings -> {
                     // 앱 설정 화면으로 이동
-                    val intent = android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                        data = android.net.Uri.fromParts("package", context.packageName, null)
-                    }
+                    val intent =
+                        android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                            .apply {
+                                data =
+                                    android.net.Uri.fromParts("package", context.packageName, null)
+                            }
                     context.startActivity(intent)
                 }
-                
+
                 is HomeEffect.UpdateBluetoothProgress -> {
                     // 블루투스 진행 상태 업데이트 - UI에서 처리됨
                 }
-                
+
                 is HomeEffect.ShowToast -> {
-                    android.widget.Toast.makeText(context, navigationEffect.message, android.widget.Toast.LENGTH_SHORT).show()
+                    android.widget.Toast.makeText(
+                        context,
+                        navigationEffect.message,
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
                 }
-                
+
                 is HomeEffect.PlaySound -> {
                     // Handle sound effects - could implement MediaPlayer here
                     // For now, just use system notification sound for success
                     if (navigationEffect.soundType == SoundType.SUCCESS) {
-                        val notification = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION)
-                        val ringtone = android.media.RingtoneManager.getRingtone(context, notification)
+                        val notification =
+                            android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION)
+                        val ringtone =
+                            android.media.RingtoneManager.getRingtone(context, notification)
                         ringtone?.play()
                     }
                 }
-                
 
-                
+
                 HomeEffect.ShowConnectionSuccessAnimation -> {
                     // Connection success animation handled in UI state
                 }
-                
+
                 is HomeEffect.ShowBleDevicePicker -> {
                     // ShowBleDevicePicker effect는 더 이상 필요없음 - 상태 기반으로 처리
                 }
-                
+
                 else -> {
                     // Handle other effects like sharing, errors, etc.
                 }
             }
         }
     }
-    
+
     // Load initial data
     LaunchedEffect(Unit) {
         viewModel.onEvent(HomeEvent.LoadData)
     }
-    
+
+    // MainViewModel 자동 연결 상태 감지 (MainActivity에서 권한 체크 후 시작됨)
+    val isAutoConnecting = mainBleState.isAutoConnecting
+    val autoConnectResult = mainBleState.autoConnectResult
+
+    // 자동 연결 결과 처리 - 성공 시에만 토스트 표시
+    LaunchedEffect(autoConnectResult) {
+        autoConnectResult?.let { result ->
+            when (result) {
+                is AutoConnectResult.Success -> {
+                    // 자동 연결 성공 - 토스트 표시
+                    // TODO: HomeEffect 대신 SnackbarHost 또는 직접 토스트 처리 필요
+                    Log.d("HomeScreen", "Auto-connect success: ${result.deviceName}")
+                }
+
+                is AutoConnectResult.Failed -> {
+                    // 자동 연결 실패 - 조용히 로그만 기록
+                    Log.d("HomeScreen", "Auto-connect failed: ${result.reason}")
+                }
+
+                is AutoConnectResult.NotAttempted -> {
+                    // 자동 연결 시도하지 않음 - 조용히 로그 기록
+                    Log.d("HomeScreen", "Auto-connect not attempted")
+                }
+            }
+        }
+    }
+
     HomeScreenContent(
         uiState = uiState,
         onEvent = viewModel::onEvent,
+        isConnected = isConnected,
+        scannedDevices = scannedDevices,
+        showDevicePicker = showDevicePicker,
+        activity = activity,
+        mainViewModel = mainViewModel,
+        isAutoConnecting = isAutoConnecting,
         modifier = modifier
     )
 }
@@ -196,6 +306,12 @@ fun HomeScreen(
 fun HomeScreenContent(
     uiState: HomeViewState,
     onEvent: (HomeEvent) -> Unit,
+    isConnected: Boolean,
+    scannedDevices: List<DeviceInfo>,
+    showDevicePicker: Boolean,
+    activity: MainActivity?,
+    mainViewModel: MainViewModel?,
+    isAutoConnecting: Boolean,
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -210,7 +326,7 @@ fun HomeScreenContent(
                 .padding(horizontal = 20.dp)
         ) {
             Spacer(modifier = Modifier.height(60.dp))
-            
+
             // 위시 리스트 섹션 (과거 기록이 있으면 표시)
             if (uiState.recentRecords.isNotEmpty()) {
                 WishListSection(
@@ -221,9 +337,9 @@ fun HomeScreenContent(
                 )
                 Spacer(modifier = Modifier.height(30.dp))
             }
-            
+
             // 오늘의 카운트 카드
-            if (uiState.todayWishCount != null) {
+            if (uiState.todayWishUiState != null) {
                 TodayCountCard(
                     currentCount = uiState.currentCount,
                     targetCount = uiState.targetCount,
@@ -232,7 +348,7 @@ fun HomeScreenContent(
                 )
                 Spacer(modifier = Modifier.height(20.dp))
             }
-            
+
             // 디버깅: BLE 연결 상태 표시
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -240,102 +356,197 @@ fun HomeScreenContent(
                     containerColor = Color(0xFFFFF3E0)
                 )
             ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text(
-                        text = "🔍 BLE 디버그 정보",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "상태: ${uiState.bleConnectionState}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Text_Secondary
-                    )
-                    Text(
-                        text = "연결됨: ${if (uiState.isBleConnected) "✅ 예" else "❌ 아니오"}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Text_Secondary
-                    )
-                    if (uiState.isLoading) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(top = 4.dp)
-                        ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(12.dp),
-                                strokeWidth = 2.dp,
-                                color = Purple_Primary
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "스캔 중...",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Purple_Primary
-                            )
-                        }
+                if (uiState.isLoading) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(top = 4.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(12.dp),
+                            strokeWidth = 2.dp,
+                            color = Purple_Primary
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "스캔 중...",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Purple_Primary
+                        )
                     }
                 }
             }
-            
+
             // 블루투스 상태 및 연결 버튼 (연결되지 않은 경우에만 표시)
-            if (!uiState.isBleConnected) {
+            if (!isConnected) {
+                // 현재 시간
+                val currentTime = System.currentTimeMillis()
+                // 3초 제한 체크 (마지막 스캔으로부터 3초 경과했는지)
+                val canScan = (currentTime - uiState.lastBleScanTime) >= 3000L
+
                 BluetoothConnectionStatus(
-                    onClick = { 
-                        // BLE 스캔 시작 (EnableBluetooth가 아닌 StartBleScanning 호출)
-                        onEvent(HomeEvent.StartBleScanning) 
+                    onClick = {
+                        Log.i(WR_EVENT, "[HomeScreen] ========== 수동 연결 버튼 클릭 ==========")
+                        Log.i(WR_EVENT, "[HomeScreen] [MANUAL_CONNECT_DEBUG] === 수동 연결 플로우 시작 ===")
+
+                        // 1. 현재 상태 로깅
+                        Log.i(
+                            WR_EVENT,
+                            "[HomeScreen] [MANUAL_CONNECT_DEBUG] 1. 현재 시간: $currentTime"
+                        )
+                        Log.i(
+                            WR_EVENT,
+                            "[HomeScreen] [MANUAL_CONNECT_DEBUG] 2. 마지막 스캔 시간: ${uiState.lastBleScanTime}"
+                        )
+                        Log.i(
+                            WR_EVENT,
+                            "[HomeScreen] [MANUAL_CONNECT_DEBUG] 3. isAutoConnecting: $isAutoConnecting"
+                        )
+                        Log.i(
+                            WR_EVENT,
+                            "[HomeScreen] [MANUAL_CONNECT_DEBUG] 4. 버튼 활성화 상태: ${
+                                uiState.isConnectionButtonEnabled(isAutoConnecting)
+                            }"
+                        )
+                        Log.i(WR_EVENT, "[HomeScreen] [MANUAL_CONNECT_DEBUG] 5. canScan: $canScan")
+
+                        // 연결 시도 상태가 아닐 때만 실행
+                        if (uiState.isConnectionButtonEnabled(isAutoConnecting)) {
+                            Log.i(WR_EVENT, "[HomeScreen] [MANUAL_CONNECT_DEBUG] 6. ✅ 버튼 활성화됨 - 진행")
+
+                            if (canScan) {
+                                Log.i(
+                                    WR_EVENT,
+                                    "[HomeScreen] [MANUAL_CONNECT_DEBUG] 7. ✅ 스캔 가능 - 스캔 시작"
+                                )
+
+                                // 권한 상태 사전 체크
+                                Log.i(
+                                    WR_EVENT,
+                                    "[HomeScreen] [PERMISSION_DEBUG] === 수동 연결 권한 체크 ==="
+                                )
+
+                                // MainActivity 액세스 확인
+                                if (activity == null) {
+                                    Log.e(
+                                        WR_EVENT,
+                                        "[HomeScreen] [MANUAL_CONNECT_DEBUG] ❌ MainActivity 참조 없음!"
+                                    )
+                                    return@BluetoothConnectionStatus
+                                }
+
+                                Log.i(
+                                    WR_EVENT,
+                                    "[HomeScreen] [MANUAL_CONNECT_DEBUG] 8. MainActivity 참조 확인됨"
+                                )
+
+                                try {
+                                    // 기기 스캔 시작 이벤트 트리거
+                                    Log.i(
+                                        WR_EVENT,
+                                        "[HomeScreen] [MANUAL_CONNECT_DEBUG] 9. StartScanning 이벤트 전송..."
+                                    )
+                                    onEvent(HomeEvent.StartScanning)
+
+                                    // MainActivity에서 직접 BLE 스캔 시작 (권한 체크 포함됨)
+                                    Log.i(
+                                        WR_EVENT,
+                                        "[HomeScreen] [MANUAL_CONNECT_DEBUG] 10. MainActivity.startBleScan() 호출..."
+                                    )
+                                    Log.i(
+                                        WR_EVENT,
+                                        "[HomeScreen] [PERMISSION_DEBUG] 💡 MainActivity.startBleScan()에서 자동으로 권한 체크 및 요청됩니다"
+                                    )
+                                    activity.startBleScan()
+
+                                    // 마지막 스캔 시간 업데이트
+                                    Log.i(
+                                        WR_EVENT,
+                                        "[HomeScreen] [MANUAL_CONNECT_DEBUG] 11. 스캔 시간 업데이트..."
+                                    )
+                                    onEvent(HomeEvent.UpdateLastBleScanTime(currentTime))
+
+                                    Log.i(
+                                        WR_EVENT,
+                                        "[HomeScreen] [MANUAL_CONNECT_DEBUG] 12. ✅ 수동 스캔 시작 완료"
+                                    )
+
+                                } catch (e: Exception) {
+                                    Log.e(
+                                        WR_EVENT,
+                                        "[HomeScreen] [MANUAL_CONNECT_DEBUG] ❌ 스캔 시작 실패",
+                                        e
+                                    )
+                                }
+
+                            } else {
+                                val remainingTime =
+                                    ((3000L - (currentTime - uiState.lastBleScanTime)) / 1000L).toInt() + 1
+                                Log.w(
+                                    WR_EVENT,
+                                    "[HomeScreen] [MANUAL_CONNECT_DEBUG] 7. ⏱️ 스캔 쿨다운: ${remainingTime}초 대기 필요"
+                                )
+
+                                android.widget.Toast.makeText(
+                                    activity,
+                                    "${remainingTime}초 후에 다시 시도해주세요",
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }
+
+                        Log.i(WR_EVENT, "[HomeScreen] [MANUAL_CONNECT_DEBUG] === 수동 연결 플로우 완료 ===")
+                        Log.i(WR_EVENT, "[HomeScreen] ========== 수동 연결 버튼 클릭 완료 ==========")
                     },
-                    isScanning = uiState.isLoading
-                )
-            } else {
-                Text(
-                    text = "✅ WISH RING 연결됨",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Purple_Medium,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(8.dp)
+                    uiState = uiState,
+                    isAutoConnecting = isAutoConnecting
                 )
             }
+
             Spacer(modifier = Modifier.height(20.dp))
-            
-            // 버튼 표시 로직
-            when {
-                uiState.todayWishCount == null && uiState.recentRecords.isEmpty() -> {
-                    // 완전히 비어있는 상태 (0개)
-                    WishRegistrationPrompt(
-                        onClick = { onEvent(HomeEvent.NavigateToWishInput) },
-                        remainingCount = 3
-                    )
+
+            // 버튼 표시 로직 (WISH RING 연결 시에는 버튼 숨김)
+            if (isConnected) {
+                when {
+                    uiState.todayWishUiState == null && uiState.recentRecords.isEmpty() -> {
+                        // 완전히 비어있는 상태 (0개)
+                        WishRegistrationPrompt(
+                            onClick = { onEvent(HomeEvent.NavigateToWishInput) },
+                            remainingCount = 3
+                        )
+                    }
+
+                    uiState.todayWishUiState == null && uiState.recentRecords.size < 3 -> {
+                        // 과거 기록은 있지만 3개 미만이고 오늘 위시 없음 (1-2개)
+                        WishButton(
+                            onClick = { onEvent(HomeEvent.NavigateToWishInput) }
+                        )
+                    }
+                    // 그 외 경우: 3개 이상이거나 오늘 위시 진행중이면 버튼 없음
                 }
-                uiState.todayWishCount == null && uiState.recentRecords.size < 3 -> {
-                    // 과거 기록은 있지만 3개 미만이고 오늘 위시 없음 (1-2개)
-                    WishButton(
-                        onClick = { onEvent(HomeEvent.NavigateToWishInput) }
-                    )
-                }
-                // 그 외 경우: 3개 이상이거나 오늘 위시 진행중이면 버튼 없음
             }
-            
+
             Spacer(modifier = Modifier.height(50.dp))
-            
+
             // Report Card
             ReportCard(
                 uiState = uiState,
                 onEvent = onEvent
             )
-            
+
             // Bottom spacing for floating bottom bar
             Spacer(modifier = Modifier.height(120.dp))
         }
-        
+
         // Floating Bottom Bar
         FloatingBottomBar(
             uiState = uiState,
+            isConnected = isConnected,
             onShareClick = { onEvent(HomeEvent.ShareAchievement) },
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .windowInsetsPadding(WindowInsets.systemBars)
         )
-        
+
         // Show loading overlay
         if (uiState.isLoading) {
             Box(
@@ -350,7 +561,7 @@ fun HomeScreenContent(
                 )
             }
         }
-        
+
         // Show error snackbar
         uiState.error?.let { errorMessage ->
             LaunchedEffect(errorMessage) {
@@ -360,7 +571,7 @@ fun HomeScreenContent(
                 onEvent(HomeEvent.DismissError)
             }
         }
-        
+
         // Share dialog
         if (uiState.showShareDialog) {
             ShareDialog(
@@ -373,7 +584,7 @@ fun HomeScreenContent(
                 }
             )
         }
-        
+
         // Permission explanation dialog
         if (uiState.showPermissionExplanation) {
             PermissionExplanationDialog(
@@ -386,7 +597,7 @@ fun HomeScreenContent(
                 }
             )
         }
-        
+
         // Permission denied dialog
         if (uiState.showPermissionDenied) {
             PermissionDeniedDialog(
@@ -399,26 +610,55 @@ fun HomeScreenContent(
                 }
             )
         }
-        
-        // BLE Device Picker Dialog
-        if (uiState.showBleDevicePicker) {
+
+        // 다이얼로그 표시 시 스캔 완료 이벤트 트리거
+        LaunchedEffect(showDevicePicker && scannedDevices.isNotEmpty()) {
+            if (showDevicePicker && scannedDevices.isNotEmpty()) {
+                onEvent(HomeEvent.ScanCompleted)
+            }
+        }
+
+        if (showDevicePicker && scannedDevices.isNotEmpty()) {
+            Log.i(WR_EVENT, "[HomeScreen] ===== BLE 기기 선택 다이얼로그 표시 =====")
             BleDevicePickerDialog(
-                devices = uiState.availableBleDevices,
+                devices = scannedDevices.map {
+                    DeviceInfo(it.name, it.address, it.rssi)
+                },
                 onDeviceSelected = { deviceAddress ->
-                    onEvent(HomeEvent.SelectBleDevice(deviceAddress))
+                    try {
+                        onEvent(HomeEvent.StartConnectionAttempt)
+
+                        if (activity == null) {
+                            return@BleDevicePickerDialog
+                        }
+
+                        activity.connectToDeviceByAddress(deviceAddress)
+
+                        mainViewModel?.dismissDevicePicker()
+
+                        Log.i(WR_EVENT, "[HomeScreen] [DEVICE_CONNECT_DEBUG] 5. ✅ 기기 연결 시작 완료")
+
+                    } catch (e: Exception) {
+                        Log.e(WR_EVENT, "[HomeScreen] [DEVICE_CONNECT_DEBUG] ❌ 기기 연결 시작 실패", e)
+                    }
+
+                    Log.i(WR_EVENT, "[HomeScreen] [DEVICE_CONNECT_DEBUG] === 기기 연결 플로우 완료 ===")
+                    Log.i(WR_EVENT, "[HomeScreen] ========== 기기 선택 및 연결 완료 ==========")
                 },
                 onDismiss = {
-                    onEvent(HomeEvent.DismissBleDevicePicker)
+                    mainViewModel?.dismissDevicePicker()
                 }
             )
         }
-        
+
         // Connection success animation
         if (uiState.showConnectionSuccessAnimation) {
             ConnectionSuccessAnimation(
                 modifier = Modifier.align(Alignment.Center)
             )
         }
+
+
     }
 }
 
@@ -440,7 +680,7 @@ private fun TodayCountCard(
             modifier = Modifier.padding(vertical = 24.dp)
         ) {
 
-            
+
             // Count and Progress Row with Divider
             Row(
                 modifier = Modifier.fillMaxWidth().height(120.dp),
@@ -471,7 +711,7 @@ private fun TodayCountCard(
                         )
                     }
                 }
-                
+
                 // Center: Vertical Divider
                 VerticalDivider(
                     color = Color(0xFFDBDBDB),
@@ -479,7 +719,7 @@ private fun TodayCountCard(
                         .fillMaxHeight()
                         .width(0.5.dp)
                 )
-                
+
                 // Right: Circular Progress
                 Box(
                     contentAlignment = Alignment.Center,
@@ -493,80 +733,6 @@ private fun TodayCountCard(
                     )
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun WishNavigationHeader(
-    wishText: String,
-    navigationText: String,
-    canNavigatePrevious: Boolean,
-    canNavigateNext: Boolean,
-    onPreviousClick: () -> Unit,
-    onNextClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Previous button
-        IconButton(
-            onClick = onPreviousClick,
-            enabled = canNavigatePrevious,
-            modifier = Modifier.size(32.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.KeyboardArrowLeft,
-                contentDescription = "Previous wish",
-                tint = if (canNavigatePrevious) Purple_Medium else Color(0xFFCCCCCC),
-                modifier = Modifier.size(20.dp)
-            )
-        }
-        
-        // Center content: Wish text and navigation indicator
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.weight(1f)
-        ) {
-            Text(
-                text = wishText,
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium
-                ),
-                color = Color(0xFF333333),
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            
-            Spacer(modifier = Modifier.height(4.dp))
-            
-            Text(
-                text = navigationText,
-                style = MaterialTheme.typography.bodySmall.copy(
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Normal
-                ),
-                color = Purple_Medium
-            )
-        }
-        
-        // Next button
-        IconButton(
-            onClick = onNextClick,
-            enabled = canNavigateNext,
-            modifier = Modifier.size(32.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.KeyboardArrowRight,
-                contentDescription = "Next wish",
-                tint = if (canNavigateNext) Purple_Medium else Color(0xFFCCCCCC),
-                modifier = Modifier.size(20.dp)
-            )
         }
     }
 }
@@ -599,9 +765,9 @@ private fun WishRegistrationPrompt(
                 color = Color(0xFF333333),
                 textAlign = TextAlign.Center
             )
-            
+
             Spacer(modifier = Modifier.height(12.dp))
-            
+
             Text(
                 text = "매일 새로운 목표를 설정하여\n꾸준히 성장해보세요",
                 style = MaterialTheme.typography.bodyMedium.copy(
@@ -612,9 +778,9 @@ private fun WishRegistrationPrompt(
                 textAlign = TextAlign.Center,
                 lineHeight = 20.sp
             )
-            
+
             Spacer(modifier = Modifier.height(8.dp))
-            
+
             Text(
                 text = "${remainingCount}개를 더 등록할 수 있어요",
                 style = MaterialTheme.typography.bodySmall.copy(
@@ -624,9 +790,9 @@ private fun WishRegistrationPrompt(
                 color = Purple_Medium,
                 textAlign = TextAlign.Center
             )
-            
+
             Spacer(modifier = Modifier.height(32.dp))
-            
+
             Button(
                 onClick = onClick,
                 colors = ButtonDefaults.buttonColors(
@@ -649,7 +815,6 @@ private fun WishRegistrationPrompt(
         }
     }
 }
-
 
 
 @Composable
@@ -702,15 +867,18 @@ private fun WishButton(
 @Composable
 private fun BluetoothConnectionStatus(
     onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    isScanning: Boolean = false
+    uiState: HomeViewState,
+    isAutoConnecting: Boolean,
+    modifier: Modifier = Modifier
 ) {
     // 블루투스 연결하기 버튼
     Button(
         onClick = onClick,
-        enabled = !isScanning,
+        enabled = uiState.isConnectionButtonEnabled(isAutoConnecting),
         colors = ButtonDefaults.buttonColors(
-            containerColor = if (isScanning) Color(0xFF90CAF9) else Color(0xFF2196F3),
+            containerColor = if (uiState.shouldShowConnectionLoading(isAutoConnecting)) Color(
+                0xFF90CAF9
+            ) else Color(0xFF2196F3),
             disabledContainerColor = Color(0xFF90CAF9)
         ),
         shape = RoundedCornerShape(8.dp),
@@ -722,7 +890,7 @@ private fun BluetoothConnectionStatus(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
-            if (isScanning) {
+            if (uiState.shouldShowConnectionLoading(isAutoConnecting)) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(20.dp),
                     color = Color.White,
@@ -738,7 +906,7 @@ private fun BluetoothConnectionStatus(
             }
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = if (isScanning) "기기 검색 중..." else "WISH RING 연결하기",
+                text = uiState.getConnectionButtonText(isAutoConnecting),
                 style = MaterialTheme.typography.labelLarge.copy(
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
@@ -781,7 +949,7 @@ private fun ReportCard(
                 color = Text_Primary,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
-            
+
             // Report content (wish list moved to top section)
             Box(
                 contentAlignment = Alignment.Center,
@@ -803,6 +971,7 @@ private fun ReportCard(
 @Composable
 private fun FloatingBottomBar(
     uiState: HomeViewState,
+    isConnected: Boolean,
     onShareClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -819,33 +988,44 @@ private fun FloatingBottomBar(
                 .padding(horizontal = 20.dp, vertical = 30.dp)
         ) {
             // Battery status
-            // Battery level display - only show when connected and available
-            if (uiState.shouldShowBatteryLevel) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_battery),
-                        contentDescription = stringResource(id = R.string.battery_description),
-                        tint = if (uiState.deviceBatteryLevel != null && uiState.deviceBatteryLevel!! < 20) Color.Red else Text_Secondary,
-                        modifier = Modifier.size(width = 37.dp, height = 21.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
+            // Battery level display - always show icon, percentage only when connected
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+
+                // 배터리 아이콘은 항상 표시
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_battery),
+                    contentDescription = stringResource(id = R.string.battery_description),
+                    tint = if (uiState.deviceBatteryLevel != null && uiState.deviceBatteryLevel < 20) Color.Red else Text_Secondary,
+                    modifier = Modifier.size(width = 37.dp, height = 21.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+
+                // 배터리 퍼센트는 연결되고 값이 있을 때만 표시
+                if (isConnected && uiState.deviceBatteryLevel != null) {
                     Text(
-                        text = "${uiState.deviceBatteryLevel ?: 0}%",
+                        text = "${uiState.deviceBatteryLevel}%",
                         style = MaterialTheme.typography.bodySmall.copy(
                             fontSize = 8.sp,
                             fontWeight = FontWeight.Medium
                         ),
-                        color = if (uiState.showLowBatteryWarning) Color.Red else Text_Secondary
+                        color = if (uiState.deviceBatteryLevel < 20) Color.Red else Text_Secondary
+                    )
+                } else if (isConnected) {
+                    // 배터리 레벨 로딩 중
+                    Text(
+                        text = "연결중...",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Medium
+                        ),
+                        color = Text_Secondary
                     )
                 }
-            } else {
-                // Empty space when battery not available
-                Spacer(modifier = Modifier.weight(1f))
             }
-            
+
             // Share button
             IconButton(
                 onClick = onShareClick
@@ -888,7 +1068,7 @@ private fun BleDevicePickerDialog(
                     color = Text_Secondary,
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
-                
+
                 LazyColumn {
                     items(devices) { device ->
                         Card(
@@ -914,12 +1094,13 @@ private fun BleDevicePickerDialog(
                                     tint = Purple_Medium,
                                     modifier = Modifier.size(12.dp)
                                 )
-                                
+
                                 Spacer(modifier = Modifier.width(12.dp))
-                                
+
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = device.name.takeIf { it.isNotBlank() } ?: "Unknown Device",
+                                        text = device.name.takeIf { it.isNotBlank() }
+                                            ?: "Unknown Device",
                                         style = MaterialTheme.typography.bodyLarge,
                                         color = Text_Primary,
                                         fontWeight = FontWeight.Medium
@@ -930,7 +1111,7 @@ private fun BleDevicePickerDialog(
                                         color = Text_Secondary
                                     )
                                 }
-                                
+
                                 // Signal strength
                                 Column(horizontalAlignment = Alignment.End) {
                                     Text(
@@ -952,7 +1133,9 @@ private fun BleDevicePickerDialog(
                                                     .width(3.dp)
                                                     .height(((index + 1) * 3).dp)
                                                     .background(
-                                                        if (isActive) Purple_Medium else Color.Gray.copy(alpha = 0.3f),
+                                                        if (isActive) Purple_Medium else Color.Gray.copy(
+                                                            alpha = 0.3f
+                                                        ),
                                                         RoundedCornerShape(1.dp)
                                                     )
                                             )
@@ -978,3 +1161,5 @@ private fun BleDevicePickerDialog(
         modifier = Modifier.padding(16.dp)
     )
 }
+
+

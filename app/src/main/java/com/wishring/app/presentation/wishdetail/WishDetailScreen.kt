@@ -40,7 +40,7 @@ fun WishDetailScreen(
     viewModel: WishDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    
+
     // Handle effects
     LaunchedEffect(Unit) {
         viewModel.effect.collect { effect ->
@@ -52,7 +52,7 @@ fun WishDetailScreen(
             }
         }
     }
-    
+
     Scaffold(
         containerColor = Background_Secondary,
         topBar = {
@@ -86,7 +86,7 @@ private fun WishDetailContent(
             onPreviousClick = { onEvent(WishDetailEvent.NavigateToPreviousDate) },
             onNextClick = { onEvent(WishDetailEvent.NavigateToNextDate) }
         )
-        
+
         // Scrollable content
         Column(
             modifier = Modifier
@@ -100,7 +100,7 @@ private fun WishDetailContent(
                 count = uiState.displayCount,
                 isLoading = uiState.isLoading
             )
-            
+
             // Wish and motivational message cards
             uiState.allMessages.forEachIndexed { index, message ->
                 MessageCard(
@@ -108,14 +108,14 @@ private fun WishDetailContent(
                     backgroundColor = if (index == 2) Color(0xFFFAFAFA) else Color.White
                 )
             }
-            
+
             Spacer(modifier = Modifier.height(30.dp))
-            
+
             // Character images at bottom
             CharacterImagesRow()
         }
     }
-    
+
     // Loading overlay
     if (uiState.isLoading) {
         Box(
@@ -125,7 +125,7 @@ private fun WishDetailContent(
             CircularProgressIndicator(color = Purple_Medium)
         }
     }
-    
+
     // Error handling
     uiState.error?.let { errorMessage ->
         LaunchedEffect(errorMessage) {
@@ -181,9 +181,9 @@ private fun DateSelectorHeader(
                 tint = Text_Primary
             )
         }
-        
+
         Spacer(modifier = Modifier.weight(1f))
-        
+
         Text(
             text = displayDate,
             style = MaterialTheme.typography.bodyMedium.copy(
@@ -193,9 +193,9 @@ private fun DateSelectorHeader(
             color = Text_Primary,
             textAlign = TextAlign.Center
         )
-        
+
         Spacer(modifier = Modifier.weight(1f))
-        
+
         // Empty space for symmetry
         Spacer(modifier = Modifier.width(48.dp))
     }
@@ -248,9 +248,9 @@ private fun CountDisplayCard(
                             modifier = Modifier.padding(bottom = 5.dp)
                         )
                     }
-                    
+
                     Spacer(modifier = Modifier.height(6.dp))
-                    
+
                     Text(
                         text = "매일의 반복이 만든 숫자입니다.\n그 반복들이 오늘의 나를 만듭니다.",
                         style = MaterialTheme.typography.bodySmall.copy(
@@ -316,9 +316,9 @@ private fun CharacterImagesRow() {
                 contentScale = ContentScale.Crop
             )
         }
-        
+
         Spacer(modifier = Modifier.width(26.dp))
-        
+
         Card(
             modifier = Modifier.size(89.dp, 115.dp),
             shape = RoundedCornerShape(5.dp),
@@ -340,7 +340,7 @@ fun WishDetailScreenPreview() {
     WishRingTheme {
         val previewState = WishDetailViewState(
             selectedDate = LocalDate.of(2025, 8, 21),
-            totalCount = 1000,
+            targetCount = 1000,
             wishText = "나는 매일 성장하고 있다",
             motivationalMessages = listOf(
                 "나는 어제보다 더 나은 내가 되고 있다.",
@@ -349,7 +349,7 @@ fun WishDetailScreenPreview() {
             ),
             isLoading = false
         )
-        
+
         WishDetailContent(
             uiState = previewState,
             onEvent = {}

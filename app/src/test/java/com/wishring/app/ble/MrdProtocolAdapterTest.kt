@@ -1,7 +1,7 @@
 package com.wishring.app.ble
 
 import com.wishring.app.data.ble.MrdProtocolAdapter
-import com.wishring.app.domain.model.HealthData
+import com.wishring.app.data.model.HealthData
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldHaveSize

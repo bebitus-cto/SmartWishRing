@@ -1,8 +1,7 @@
 package com.wishring.app.performance
 
-import com.wishring.app.domain.model.WishCount
-import com.wishring.app.domain.model.DailyRecord
-import com.wishring.app.domain.model.UserProfile
+import com.wishring.app.data.model.WishUiState
+import com.wishring.app.data.model.DailyRecord
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
@@ -14,10 +13,8 @@ import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 import org.mockito.junit.jupiter.MockitoExtension
 import java.time.LocalDate
-import java.time.LocalDateTime
 import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicLong
 import kotlin.random.Random
 import kotlin.system.measureNanoTime
 import kotlin.system.measureTimeMillis
@@ -62,10 +59,10 @@ class LargeDatasetTest {
             
             // When - 대량 객체 생성
             val wishes = List(count) { index ->
-                WishCount(
+                WishUiState(
                     date = LocalDate.now().plusDays(index.toLong()),
                     wishText = "Wish $index",
-                    targetCount = 100,
+                    currentCount = 100,
                     currentCount = Random.nextInt(0, 101)
                 )
             }
@@ -94,10 +91,10 @@ class LargeDatasetTest {
             // When - 반복적인 생성/삭제
             repeat(iterations) { iteration ->
                 val tempList = List(10000) { index ->
-                    WishCount(
+                    WishUiState(
                         date = LocalDate.now().plusDays(index.toLong()),
                         wishText = "Temp $index",
-                        targetCount = 100
+                        currentCount = 100
                     )
                 }
                 
@@ -135,10 +132,10 @@ class LargeDatasetTest {
             val processedCount = flow {
                 repeat(itemCount) { index ->
                     emit(
-                        WishCount(
+                        WishUiState(
                             date = LocalDate.now().plusDays(index.toLong()),
                             wishText = "Flow Item $index",
-                            targetCount = 100,
+                            currentCount = 100,
                             currentCount = index % 101
                         )
                     )
@@ -176,10 +173,10 @@ class LargeDatasetTest {
         fun testDateRangeQueryPerformance(dataSize: Int, maxQueryTimeMs: Long) = testScope.runTest {
             // Given - 대량 데이터 준비
             val wishes = List(dataSize) { index ->
-                WishCount(
+                WishUiState(
                     date = LocalDate.now().minusDays(index.toLong()),
                     wishText = "Query Test $index",
-                    targetCount = 100,
+                    currentCount = 100,
                     currentCount = Random.nextInt(0, 101)
                 )
             }.sortedBy { it.date }
@@ -214,14 +211,14 @@ class LargeDatasetTest {
         fun testIndexedSearchPerformance() = testScope.runTest {
             // Given - 인덱스 시뮬레이션
             val dataSize = 100000
-            val indexedData = mutableMapOf<LocalDate, WishCount>()
-            val listData = mutableListOf<WishCount>()
+            val indexedData = mutableMapOf<LocalDate, WishUiState>()
+            val listData = mutableListOf<WishUiState>()
             
             repeat(dataSize) { index ->
-                val wish = WishCount(
+                val wish = WishUiState(
                     date = LocalDate.now().minusDays(index.toLong()),
                     wishText = "Indexed $index",
-                    targetCount = 100
+                    currentCount = 100
                 )
                 indexedData[wish.date] = wish
                 listData.add(wish)
@@ -259,10 +256,10 @@ class LargeDatasetTest {
             // Given
             val dataSize = 100000
             val wishes = List(dataSize) { index ->
-                WishCount(
+                WishUiState(
                     date = LocalDate.now().minusDays(index.toLong()),
                     wishText = "Aggregate $index",
-                    targetCount = 100,
+                    currentCount = 100,
                     currentCount = Random.nextInt(0, 101)
                 )
             }
@@ -296,10 +293,10 @@ class LargeDatasetTest {
             // Given
             val totalItems = 100000
             val items = List(totalItems) { index ->
-                WishCount(
+                WishUiState(
                     date = LocalDate.now().plusDays(index.toLong()),
                     wishText = "Batch $index",
-                    targetCount = 100,
+                    currentCount = 100,
                     currentCount = index % 101
                 )
             }
@@ -362,7 +359,7 @@ class LargeDatasetTest {
         @DisplayName("백프레셔 처리")
         fun testBackpressureHandling() = testScope.runTest {
             // Given
-            val producer = Channel<WishCount>(capacity = 10)
+            val producer = Channel<WishUiState>(capacity = 10)
             val processedCount = AtomicInteger(0)
             val droppedCount = AtomicInteger(0)
             
@@ -370,10 +367,10 @@ class LargeDatasetTest {
             val producerJob = launch {
                 repeat(10000) { index ->
                     val result = producer.trySend(
-                        WishCount(
+                        WishUiState(
                             date = LocalDate.now(),
                             wishText = "Item $index",
-                            targetCount = 100
+                            currentCount = 100
                         )
                     )
                     if (!result.isSuccess) {
@@ -562,7 +559,7 @@ class LargeDatasetTest {
         fun testLRUCacheEfficiency() = testScope.runTest {
             // Given
             val cacheSize = 1000
-            val cache = LRUCache<LocalDate, WishCount>(cacheSize)
+            val cache = LRUCache<LocalDate, WishUiState>(cacheSize)
             val dataSize = 10000
             
             // 접근 패턴 생성 (80/20 rule)
@@ -589,10 +586,10 @@ class LargeDatasetTest {
                     hits++
                 } else {
                     misses++
-                    cache.put(key, WishCount(
+                    cache.put(key, WishUiState(
                         date = key,
                         wishText = "Cached",
-                        targetCount = 100
+                        currentCount = 100
                     ))
                 }
             }
@@ -608,14 +605,14 @@ class LargeDatasetTest {
         @DisplayName("캐시 워밍 성능")
         fun testCacheWarmingPerformance() = testScope.runTest {
             // Given
-            val cache = ConcurrentHashMap<LocalDate, WishCount>()
+            val cache = ConcurrentHashMap<LocalDate, WishUiState>()
             val dataSize = 10000
             
             val data = List(dataSize) { index ->
-                WishCount(
+                WishUiState(
                     date = LocalDate.now().minusDays(index.toLong()),
                     wishText = "Warm $index",
-                    targetCount = 100
+                    currentCount = 100
                 )
             }
             
@@ -658,10 +655,10 @@ class LargeDatasetTest {
                         async(Dispatchers.Default) {
                             repeat(workPerThread) { index ->
                                 // CPU 집약적 작업 시뮬레이션
-                                val wish = WishCount(
+                                val wish = WishUiState(
                                     date = LocalDate.now(),
                                     wishText = "Thread $threadId Item $index",
-                                    targetCount = 100,
+                                    currentCount = 100,
                                     currentCount = index % 101
                                 )
                                 // 복잡한 계산
@@ -722,17 +719,12 @@ class LargeDatasetTest {
         return Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()
     }
     
-    private suspend fun processBatch(batch: List<WishCount>) {
+    private suspend fun processBatch(batch: List<WishUiState>) {
         delay(batch.size.toLong() / 100) // 시뮬레이션
         batch.forEach { it.progress }
     }
     
-    private suspend fun processDailyRecords(records: List<DailyRecord>) {
-        delay(records.size.toLong() / 100)
-        records.forEach { it.completionRate }
-    }
-    
-    private fun calculateStatistics(wishes: List<WishCount>): WishStatistics {
+    private fun calculateStatistics(wishes: List<WishUiState>): WishStatistics {
         return WishStatistics(
             totalCount = wishes.sumOf { it.currentCount },
             averageCount = wishes.map { it.currentCount }.average(),
@@ -742,7 +734,7 @@ class LargeDatasetTest {
         )
     }
     
-    private fun calculateMaxStreak(wishes: List<WishCount>): Int {
+    private fun calculateMaxStreak(wishes: List<WishUiState>): Int {
         var maxStreak = 0
         var currentStreak = 0
         
@@ -768,11 +760,11 @@ class LargeDatasetTest {
         )
     }
     
-    private fun calculateComplexMetric(wish: WishCount): Double {
+    private fun calculateComplexMetric(wish: WishUiState): Double {
         // CPU 집약적 계산 시뮬레이션
         var result = 0.0
         repeat(100) {
-            result += Math.sqrt(wish.currentCount.toDouble()) * Math.log(wish.targetCount.toDouble() + 1)
+            result += Math.sqrt(wish.currentCount.toDouble()) * Math.log(wish.currentCount.toDouble() + 1)
         }
         return result
     }

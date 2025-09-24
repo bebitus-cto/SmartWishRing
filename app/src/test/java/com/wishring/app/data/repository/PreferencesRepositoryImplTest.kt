@@ -2,7 +2,7 @@ package com.wishring.app.data.repository
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
-import com.wishring.app.domain.repository.PreferencesRepository
+import com.wishring.app.data.repository.PreferencesRepository
 import io.mockk.*
 import io.mockk.impl.annotations.MockK
 import kotlinx.coroutines.flow.*

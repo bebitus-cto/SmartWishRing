@@ -1,9 +1,9 @@
 package com.wishring.app.presentation.home
 
-import com.wishring.app.domain.model.WishCount
-import com.wishring.app.domain.model.DailyRecord
-import com.wishring.app.domain.repository.BleConnectionState
-import com.wishring.app.domain.repository.StreakInfo
+import com.wishring.app.data.model.WishUiState
+import com.wishring.app.data.model.DailyRecord
+import com.wishring.app.data.repository.BleConnectionState
+import com.wishring.app.data.repository.StreakInfo
 import com.wishring.app.core.util.Constants
 
 /**
@@ -12,7 +12,7 @@ import com.wishring.app.core.util.Constants
  */
 data class HomeViewState(
     val isLoading: Boolean = false,
-    val todayWishCount: WishCount? = null,
+    val todayWishUiState: WishUiState? = null,
     val totalCount: Int = 0,
     val targetCount: Int = Constants.DEFAULT_TARGET_COUNT,
     val recentRecords: List<DailyRecord> = emptyList(),
@@ -23,27 +23,34 @@ data class HomeViewState(
     val error: String? = null,
     val showCompletionAnimation: Boolean = false,
     val lastSyncTime: Long? = null,
-    
 
-    
     // ===== 공유 기능 =====
     val showShareDialog: Boolean = false,
     val isSharing: Boolean = false,
-    
+
     // ===== 권한 관련 =====
     val showPermissionExplanation: Boolean = false,
     val permissionExplanations: Map<String, String> = emptyMap(),
     val showPermissionDenied: Boolean = false,
     val permissionDeniedMessage: String = "",
     val bluetoothProgressMessage: String = "",
-    
+
     // ===== BLE 기기 선택 =====
     val showBleDevicePicker: Boolean = false,
     val availableBleDevices: List<DeviceInfo> = emptyList(),
-    
+    val lastBleScanTime: Long = 0L, // 마지막 BLE 스캔 시간 (3초 제한용)
+
+    // ===== BLE 연결 시도 =====
+    val isScanning: Boolean = false,
+    val isAttemptingConnection: Boolean = false,
+    val connectionStartTime: Long? = null,
+
+    // ===== 자동 연결 =====
+    val autoConnectAttempted: Boolean = false,
+
     // ===== 연결 성공 애니메이션 =====
     val showConnectionSuccessAnimation: Boolean = false,
-    
+
     // ===== 디버깅 모드 =====
     val showDebugPanel: Boolean = false,
     val debugEventHistory: List<String> = emptyList()
@@ -53,19 +60,9 @@ data class HomeViewState(
      */
     val currentCount: Int
         get() = totalCount
-    
+
     /**
-     * Progress percentage (0-100) 
-     */
-    val progressPercentage: Int
-        get() = if (targetCount > 0) {
-            ((totalCount.toFloat() / targetCount) * 100).coerceIn(0f, 100f).toInt()
-        } else {
-            0
-        }
-    
-    /**
-     * Progress float value (0.0-1.0) 
+     * Progress float value (0.0-1.0)
      */
     val progress: Float
         get() = if (targetCount > 0) {
@@ -73,129 +70,75 @@ data class HomeViewState(
         } else {
             0f
         }
-    
+
     /**
-     * Is goal completed 
+     * Is goal completed
      */
     val isCompleted: Boolean
         get() = totalCount >= targetCount
-    
-    /**
-     * Remaining count to target
-     */
-    val remainingCount: Int
-        get() = (targetCount - totalCount).coerceAtLeast(0)
-    
+
     /**
      * Is BLE connected
      */
     val isBleConnected: Boolean
         get() = bleConnectionState == BleConnectionState.CONNECTED
-    
+
     /**
      * Is BLE connecting
      */
     val isBleConnecting: Boolean
         get() = bleConnectionState == BleConnectionState.CONNECTING
-    
+
     /**
      * Show low battery warning
      */
     val showLowBatteryWarning: Boolean
         get() = deviceBatteryLevel != null && deviceBatteryLevel < 20
-    
-    /**
-     * Current streak display
-     */
-    val currentStreak: Int
-        get() = streakInfo?.currentStreak ?: 0
-    
-    /**
-     * Best streak display
-     */
-    val bestStreak: Int
-        get() = streakInfo?.bestStreak ?: 0
-    
-    /**
-     * Has recent records
-     */
-    val hasRecentRecords: Boolean
-        get() = recentRecords.isNotEmpty()
-    
-    /**
-     * Show empty state
-     */
-    val showEmptyState: Boolean
-        get() = !isLoading && todayWishCount == null
-    
+
     /**
      * Can increment count (disabled - only BLE can increment)
      */
     val canIncrement: Boolean
         get() = false // Manual increment disabled
-    
+
     /**
-     * Show sync status
+     * Connection attempt duration in seconds
      */
-    val showSyncStatus: Boolean
-        get() = isBleConnected && lastSyncTime != null
-    
+    val connectionAttemptDurationSeconds: Int
+        get() = connectionStartTime?.let { startTime ->
+            ((System.currentTimeMillis() - startTime) / 1000).toInt()
+        } ?: 0
+
     /**
-     * Get sync status text
+     * Is connection attempt timed out (30 seconds)
      */
-    val syncStatusText: String
-        get() = when {
-            !isBleConnected -> "동기화 연결 끊김"
-            lastSyncTime == null -> "동기화 대기 중"
-            else -> {
-                val diff = System.currentTimeMillis() - lastSyncTime
-                when {
-                    diff < 60_000 -> "방금 동기화됨"
-                    diff < 3_600_000 -> "${diff / 60_000}분 전 동기화"
-                    else -> "${diff / 3_600_000}시간 전 동기화"
-                }
-            }
-        }
-    
+    val isConnectionAttemptTimedOut: Boolean
+        get() = isAttemptingConnection && connectionAttemptDurationSeconds >= 30
+
     /**
-     * Get connection status text
+     * Should show connection loading
+     * Shows loading when attempting connection or when BLE is connecting
      */
-    val connectionStatusText: String
-        get() = when (bleConnectionState) {
-            BleConnectionState.DISCONNECTED -> "연결 끊김"
-            BleConnectionState.CONNECTING -> "연결 중..."
-            BleConnectionState.CONNECTED -> "연결됨"
-            BleConnectionState.DISCONNECTING -> "연결 해제 중..."
-            BleConnectionState.ERROR -> "연결 오류"
-            else -> "알 수 없음"
-        }
-    
+    fun shouldShowConnectionLoading(isAutoConnecting: Boolean): Boolean =
+        isAutoConnecting || isScanning || isAttemptingConnection || isBleConnecting
+
     /**
-     * Get battery level text
+     * Connection button text based on state
+     * Manual operations (scanning, attempting connection) take priority over auto-connect
      */
-    val batteryLevelText: String
-        get() = deviceBatteryLevel?.let { "${it}%" } ?: "--"
-    
+    fun getConnectionButtonText(isAutoConnecting: Boolean): String = when {
+        isScanning -> "기기 검색 중..."
+        isAttemptingConnection -> "연결 중..."
+        isBleConnecting -> "연결 중..."
+        isBleConnected -> "연결됨"
+        isAutoConnecting -> "자동 연결 중..."
+        else -> "WISH RING 연결하기"
+    }
+
     /**
-     * Should show battery level
-     * Always show battery indicator
+     * Is connection button enabled
      */
-    val shouldShowBatteryLevel: Boolean
-        get() = true
-    
-    /**
-     * Get battery level icon
-     */
-    val batteryLevelIcon: String
-        get() = when {
-            deviceBatteryLevel == null -> "battery_unknown"
-            deviceBatteryLevel >= 80 -> "battery_full"
-            deviceBatteryLevel >= 60 -> "battery_4_bar"
-            deviceBatteryLevel >= 40 -> "battery_3_bar"
-            deviceBatteryLevel >= 20 -> "battery_2_bar"
-            deviceBatteryLevel >= 10 -> "battery_1_bar"
-            else -> "battery_alert"
-        }
-    
+    fun isConnectionButtonEnabled(isAutoConnecting: Boolean): Boolean =
+        !isAutoConnecting && !isScanning && !isAttemptingConnection && !isBleConnecting && !isBleConnected
 
 }

@@ -2,13 +2,13 @@ package com.wishring.app.presentation.home.component.preview
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
-import com.wishring.app.domain.repository.BleConnectionState
+import com.wishring.app.data.repository.BleConnectionState
 import com.wishring.app.presentation.home.component.CircularGauge
 import com.wishring.app.presentation.home.component.WishCountCard
 import com.wishring.app.presentation.home.component.WishReportItem
 import com.wishring.app.presentation.home.components.BleStatusCard
 import com.wishring.app.ui.theme.WishRingTheme
-import com.wishring.app.domain.model.BatteryStatus
+import com.wishring.app.data.model.BatteryStatus
 
 // CircularGauge Previews
 @Preview(showBackground = true)

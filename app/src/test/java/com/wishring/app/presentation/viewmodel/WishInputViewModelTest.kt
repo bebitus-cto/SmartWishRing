@@ -1,12 +1,11 @@
 package com.wishring.app.presentation.viewmodel
 
 import androidx.lifecycle.SavedStateHandle
-import com.wishring.app.domain.model.WishCount
-import com.wishring.app.domain.repository.WishCountRepository
-import com.wishring.app.domain.repository.PreferencesRepository
+import com.wishring.app.data.model.WishUiState
+import com.wishring.app.data.repository.WishCountRepository
+import com.wishring.app.data.repository.PreferencesRepository
 import com.wishring.app.presentation.wishinput.WishInputViewModel
 import com.wishring.app.presentation.wishinput.WishInputEvent
-import com.wishring.app.presentation.wishinput.WishInputViewState
 import com.wishring.app.presentation.wishinput.WishInputEffect
 import com.wishring.app.presentation.wishinput.ValidationField
 import com.wishring.app.presentation.wishinput.model.WishItem
@@ -18,15 +17,11 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.test.*
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.*
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.ValueSource
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.kotest.matchers.string.shouldContain
 import app.cash.turbine.test
 import java.time.LocalDate
-import java.util.UUID
 
 @ExperimentalCoroutinesApi
 @DisplayName("WishInputViewModel 멀티위시 테스트")
@@ -469,12 +464,12 @@ class WishInputViewModelTest {
         fun `should execute delete confirmation`() = runTest {
             // Given
             val today = LocalDate.now().toString()
-            val existingRecord = WishCount(
+            val existingRecord = WishUiState(
                 id = 1,
                 date = today,
-                totalCount = 100,
+                targetCount = 100,
                 wishText = "기존 위시",
-                targetCount = 1000
+                currentCount = 1000
             )
             coEvery { wishCountRepository.getWishCountByDate(today) } returns existingRecord
             
@@ -485,7 +480,7 @@ class WishInputViewModelTest {
             // Then
             coVerify { 
                 wishCountRepository.saveWishCount(
-                    existingRecord.copy(totalCount = 0, wishText = "")
+                    existingRecord.copy(targetCount = 0, wishText = "")
                 )
             }
             
@@ -560,12 +555,12 @@ class WishInputViewModelTest {
         fun `should check and load today's record on init`() = runTest {
             // Given
             val today = LocalDate.now().toString()
-            val existingRecord = WishCount(
+            val existingRecord = WishUiState(
                 id = 1,
                 date = today,
-                totalCount = 50,
+                targetCount = 50,
                 wishText = "기존 위시",
-                targetCount = 1500
+                currentCount = 1500
             )
             coEvery { wishCountRepository.getDailyRecord(today) } returns existingRecord
             
@@ -593,12 +588,12 @@ class WishInputViewModelTest {
         fun `should load existing record by date`() = runTest {
             // Given
             val targetDate = "2024-01-15"
-            val existingRecord = WishCount(
+            val existingRecord = WishUiState(
                 id = 1,
                 date = targetDate,
-                totalCount = 75,
+                targetCount = 75,
                 wishText = "과거 위시",
-                targetCount = 2000
+                currentCount = 2000
             )
             coEvery { wishCountRepository.getDailyRecord(targetDate) } returns existingRecord
             
@@ -622,12 +617,12 @@ class WishInputViewModelTest {
         fun `should not load empty records`() = runTest {
             // Given
             val today = LocalDate.now().toString()
-            val emptyRecord = WishCount(
+            val emptyRecord = WishUiState(
                 id = 1,
                 date = today,
-                totalCount = 0,
+                targetCount = 0,
                 wishText = "", // Empty text
-                targetCount = 1000
+                currentCount = 1000
             )
             coEvery { wishCountRepository.getDailyRecord(today) } returns emptyRecord
             

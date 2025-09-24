@@ -10,7 +10,7 @@ import java.time.format.DateTimeFormatter
 data class WishDetailViewState(
     val isLoading: Boolean = false,
     val selectedDate: LocalDate = LocalDate.now(),
-    val totalCount: Int = 0,
+    val targetCount: Int = 0,
     val wishText: String = "",
     val motivationalMessages: List<String> = emptyList(),
     val error: String? = null
@@ -25,7 +25,7 @@ data class WishDetailViewState(
      * Formatted count with comma separator
      */
     val displayCount: String
-        get() = totalCount.toString().replace(Regex("(\\d)(?=(\\d{3})+(?!\\d))"), "$1,")
+        get() = targetCount.toString().replace(Regex("(\\d)(?=(\\d{3})+(?!\\d))"), "$1,")
     
     /**
      * All messages to display (wish text + motivational messages)

@@ -114,6 +114,17 @@ sealed class HomeEvent {
      * Update from background sync
      */
     object BackgroundSyncCompleted : HomeEvent()
+    /**
+     * Update battery level from device
+     * @param level Battery level percentage (0-100) or null
+     */
+    data class UpdateBatteryLevel(val level: Int?) : HomeEvent()
+    
+    /**
+     * Update last BLE scan time for throttling
+     * @param time System time in milliseconds
+     */
+    data class UpdateLastBleScanTime(val time: Long) : HomeEvent()
     
     /**
      * Handle deep link
@@ -170,5 +181,38 @@ sealed class HomeEvent {
      * Open app settings from permission denied dialog
      */
     object OpenAppSettingsFromDialog : HomeEvent()
+    
+    /**
+     * Start connection attempt (triggered when device is selected)
+     */
+    /**
+     * Start BLE device scanning
+     */
+    object StartScanning : HomeEvent()
+    
+    /**
+     * BLE scanning completed (devices found and dialog shown)
+     */
+    object ScanCompleted : HomeEvent()
+    
+    /**
+     * Start connection attempt (triggered when device is selected)
+     */
+    object StartConnectionAttempt : HomeEvent()
+    
+    /**
+     * Connection attempt completed (success or failure)
+     */
+    object ConnectionAttemptCompleted : HomeEvent()
+    
+    /**
+     * Connection failed with error message
+     * @param error Error message to display
+     */
+    data class ConnectionFailed(val error: String) : HomeEvent()
+    
+
+    
+
 
 }

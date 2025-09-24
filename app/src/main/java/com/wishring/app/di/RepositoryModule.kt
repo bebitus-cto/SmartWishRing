@@ -1,13 +1,9 @@
 package com.wishring.app.di
 
+import com.wishring.app.data.repository.PreferencesRepository
 import com.wishring.app.data.repository.PreferencesRepositoryImpl
-import com.wishring.app.data.repository.ResetLogRepositoryImpl
+import com.wishring.app.data.repository.WishCountRepository
 import com.wishring.app.data.repository.WishCountRepositoryImpl
-
-import com.wishring.app.domain.repository.PreferencesRepository
-import com.wishring.app.domain.repository.ResetLogRepository
-import com.wishring.app.domain.repository.WishCountRepository
-
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -30,15 +26,6 @@ abstract class RepositoryModule {
     abstract fun bindWishCountRepository(
         wishCountRepositoryImpl: WishCountRepositoryImpl
     ): WishCountRepository
-    
-    /**
-     * Binds ResetLogRepository implementation
-     */
-    @Binds
-    @Singleton
-    abstract fun bindResetLogRepository(
-        resetLogRepositoryImpl: ResetLogRepositoryImpl
-    ): ResetLogRepository
     
     /**
      * Binds PreferencesRepository implementation

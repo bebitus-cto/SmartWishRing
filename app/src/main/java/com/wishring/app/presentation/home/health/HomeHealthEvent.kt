@@ -1,6 +1,6 @@
 package com.wishring.app.presentation.home.health
 
-import com.wishring.app.domain.model.*
+import com.wishring.app.data.model.*
 
 /**
  * Events for Home Health functionality

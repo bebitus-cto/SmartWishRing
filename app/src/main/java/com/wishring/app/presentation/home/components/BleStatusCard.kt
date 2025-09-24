@@ -23,9 +23,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.wishring.app.R
-import com.wishring.app.domain.repository.BleConnectionState
-import com.wishring.app.domain.repository.isConnected
-import com.wishring.app.domain.model.BatteryStatus
+import com.wishring.app.data.repository.BleConnectionState
+
+import com.wishring.app.data.model.BatteryStatus
 
 /**
  * Extension function to get status text for BleConnectionState enum
@@ -33,6 +33,7 @@ import com.wishring.app.domain.model.BatteryStatus
 private fun BleConnectionState.statusText(): String {
     return when (this) {
         BleConnectionState.DISCONNECTED -> "연결 안됨"
+        BleConnectionState.SCANNING -> "기기 검색 중..."
         BleConnectionState.CONNECTING -> "연결 중..."
         BleConnectionState.CONNECTED -> "연결됨"
         BleConnectionState.DISCONNECTING -> "연결 해제 중..."
@@ -57,7 +58,7 @@ fun BleStatusCard(
         modifier = modifier
             .fillMaxWidth()
             .clickable { 
-                if (!connectionState.isConnected()) {
+                if (connectionState != BleConnectionState.CONNECTED) {
                     onRetryConnection()
                 }
             },
@@ -127,15 +128,14 @@ fun BleStatusCard(
             Row(
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Battery indicator (only when connected)
-                if (connectionState.isConnected()) {
-                    BatteryIndicator(
-                        level = batteryLevel,
-                        status = batteryStatus
-                    )
-                    
-                    Spacer(modifier = Modifier.width(8.dp))
-                }
+                // Battery indicator (always show icon, percentage only when available)
+                BatteryIndicator(
+                    level = batteryLevel,
+                    status = batteryStatus,
+                    showPercentage = (connectionState == BleConnectionState.CONNECTED)
+                )
+                
+                Spacer(modifier = Modifier.width(8.dp))
                 
                 // Action button
                 when (connectionState) {
@@ -162,6 +162,7 @@ fun BleStatusCard(
                             )
                         }
                     }
+                    BleConnectionState.SCANNING,
                     BleConnectionState.CONNECTING,
                     BleConnectionState.DISCONNECTING -> {
                         CircularProgressIndicator(
@@ -182,6 +183,7 @@ fun BleStatusCard(
 private fun BatteryIndicator(
     level: Int,
     status: BatteryStatus,
+    showPercentage: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val batteryColor = when (status) {
@@ -207,13 +209,15 @@ private fun BatteryIndicator(
             modifier = Modifier.size(20.dp)
         )
         
-        Spacer(modifier = Modifier.width(4.dp))
-        
-        Text(
-            text = "$level%",
-            style = MaterialTheme.typography.bodySmall,
-            color = batteryColor,
-            fontWeight = FontWeight.Medium
-        )
+        if (showPercentage && level > 0) {
+            Spacer(modifier = Modifier.width(4.dp))
+            
+            Text(
+                text = "$level%",
+                style = MaterialTheme.typography.bodySmall,
+                color = batteryColor,
+                fontWeight = FontWeight.Medium
+            )
+        }
     }
 }

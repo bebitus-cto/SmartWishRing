@@ -2,7 +2,7 @@ package com.wishring.app.ble
 
 import android.content.Context
 import app.cash.turbine.test
-import com.wishring.app.domain.repository.*
+import com.wishring.app.data.repository.*
 import io.mockk.*
 import io.mockk.impl.annotations.MockK
 import kotlinx.coroutines.*
@@ -15,7 +15,6 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.EnumSource
 import org.junit.jupiter.params.provider.ValueSource
 import org.mockito.junit.jupiter.MockitoExtension
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * Comprehensive BLE Repository Implementation Test
@@ -58,9 +57,7 @@ class BleRepositoryImplTest {
         
         // Create repository instance
         bleRepository = BleRepositoryImpl(
-            context = mockContext,
-            mrdProtocolAdapter = mockMrdProtocolAdapter,
-            ioDispatcher = testDispatcher
+            mrdProtocolAdapter = mockMrdProtocolAdapter
         )
     }
     
@@ -509,9 +506,7 @@ class BleRepositoryImplTest {
         fun testNullContextHandling() = testScope.runTest {
             // Given
             val repositoryWithNullContext = BleRepositoryImpl(
-                context = mockContext,
-                mrdProtocolAdapter = mockMrdProtocolAdapter,
-                ioDispatcher = testDispatcher
+                mrdProtocolAdapter = mockMrdProtocolAdapter
             )
             
             // When & Then
@@ -565,9 +560,7 @@ class BleRepositoryImplTest {
             // Given
             val newDispatcher = StandardTestDispatcher()
             val repositoryWithNewDispatcher = BleRepositoryImpl(
-                context = mockContext,
-                mrdProtocolAdapter = mockMrdProtocolAdapter,
-                ioDispatcher = newDispatcher
+                mrdProtocolAdapter = mockMrdProtocolAdapter
             )
             
             // When & Then

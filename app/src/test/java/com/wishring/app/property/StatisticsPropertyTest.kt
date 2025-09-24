@@ -1,12 +1,8 @@
 package com.wishring.app.property
 
-import com.wishring.app.domain.model.Statistics
-import com.wishring.app.domain.model.WishCount
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.doubles.shouldBeGreaterThanOrEqual
 import io.kotest.matchers.doubles.shouldBeLessThanOrEqual
-import io.kotest.matchers.ints.shouldBeGreaterThanOrEqual
-import io.kotest.matchers.ints.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
 import io.kotest.property.Arb
 import io.kotest.property.arbitrary.*
@@ -14,7 +10,6 @@ import io.kotest.property.assume
 import io.kotest.property.checkAll
 import io.kotest.property.forAll
 import org.junit.jupiter.api.DisplayName
-import java.time.LocalDate
 import kotlin.math.*
 
 /**

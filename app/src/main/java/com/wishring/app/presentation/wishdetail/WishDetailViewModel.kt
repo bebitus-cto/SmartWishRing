@@ -3,7 +3,7 @@ package com.wishring.app.presentation.wishdetail
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.wishring.app.domain.repository.WishCountRepository
+import com.wishring.app.data.repository.WishCountRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -74,7 +74,7 @@ class WishDetailViewModel @Inject constructor(
                 _uiState.update { state ->
                     state.copy(
                         isLoading = false,
-                        totalCount = dailyRecord?.totalCount ?: 0,
+                        targetCount = dailyRecord?.targetCount ?: 0,
                         wishText = dailyRecord?.wishText ?: "",
                         motivationalMessages = getMotivationalMessages()
                     )

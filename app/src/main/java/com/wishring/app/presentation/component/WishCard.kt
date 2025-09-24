@@ -36,7 +36,8 @@ fun WishCard(
     onTargetCountChange: ((Int) -> Unit)? = null,
     onDelete: (() -> Unit)? = null,
     showDeleteButton: Boolean = false,
-    placeholder: String = "소원을 입력하세요..."
+    placeholder: String = "소원을 입력하세요...",
+    showTargetCount: Boolean = true
 ) {
     Surface(
         modifier = modifier
@@ -57,7 +58,8 @@ fun WishCard(
                 onTargetCountChange = onTargetCountChange ?: {},
                 onDelete = onDelete,
                 showDeleteButton = showDeleteButton,
-                placeholder = placeholder
+                placeholder = placeholder,
+                showTargetCount = showTargetCount
             )
         } else {
             WishDisplayCard(wishText = wishText)
@@ -96,28 +98,19 @@ private fun WishInputCard(
     onTargetCountChange: (Int) -> Unit,
     onDelete: (() -> Unit)?,
     showDeleteButton: Boolean,
-    placeholder: String
+    placeholder: String,
+    showTargetCount: Boolean = true
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(16.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "소원",
-                style = MaterialTheme.typography.bodySmall.copy(
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold
-                ),
-                color = Color(0xFF666666)
-            )
-            
-            if (showDeleteButton && onDelete != null) {
+        if (showDeleteButton && onDelete != null) {
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.TopEnd
+            ) {
                 IconButton(
                     onClick = onDelete,
                     modifier = Modifier.size(24.dp)
@@ -132,7 +125,7 @@ private fun WishInputCard(
             }
         }
         
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(if (showDeleteButton && onDelete != null) 8.dp else 0.dp))
         
         // Text input field
         Box(
@@ -171,30 +164,32 @@ private fun WishInputCard(
             )
         }
         
-        Spacer(modifier = Modifier.height(12.dp))
-        
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "목표 횟수",
-                style = MaterialTheme.typography.bodySmall.copy(
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold
-                ),
-                color = Color(0xFF666666)
-            )
+        if (showTargetCount) {
+            Spacer(modifier = Modifier.height(12.dp))
             
-            // Custom Number Picker for target count
-            CustomNumberPicker(
-                selectedValue = targetCount,
-                onValueChange = onTargetCountChange,
-                range = 100..10000,
-                step = 100,
-                modifier = Modifier.size(width = 80.dp, height = 120.dp)
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "목표 횟수",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    ),
+                    color = Color(0xFF666666)
+                )
+                
+                // Custom Number Picker for target count
+                CustomNumberPicker(
+                    selectedValue = targetCount,
+                    onValueChange = onTargetCountChange,
+                    range = 100..10000,
+                    step = 100,
+                    modifier = Modifier.size(width = 80.dp, height = 120.dp)
+                )
+            }
         }
     }
 }

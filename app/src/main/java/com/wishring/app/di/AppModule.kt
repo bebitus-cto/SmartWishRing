@@ -1,11 +1,8 @@
 package com.wishring.app.di
 
 import android.content.Context
-import androidx.room.Room
 import com.wishring.app.data.local.database.WishRingDatabase
-import com.wishring.app.data.local.database.dao.ResetLogDao
 import com.wishring.app.data.local.database.dao.WishCountDao
-import com.wishring.app.data.local.dao.BleEventDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -68,23 +65,7 @@ object AppModule {
      */
     @Provides
     fun provideWishCountDao(database: WishRingDatabase): WishCountDao {
-        return database.wishCountDao()
-    }
-    
-    /**
-     * Provides ResetLogDao  
-     */
-    @Provides
-    fun provideResetLogDao(database: WishRingDatabase): ResetLogDao {
-        return database.resetLogDao()
-    }
-    
-    /**
-     * Provides BleEventDao
-     */
-    @Provides
-    fun provideBleEventDao(database: WishRingDatabase): BleEventDao {
-        return database.bleEventDao()
+        return database.wishDao()
     }
 }
 

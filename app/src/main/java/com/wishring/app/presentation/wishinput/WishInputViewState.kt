@@ -16,14 +16,6 @@ data class WishInputViewState(
     val error: String? = null,
     val showDeleteConfirmation: Boolean = false,
     val maxWishCount: Int = 3,
-    val suggestedWishes: List<String> = listOf(
-        "나는 매일 성장하고 있다",
-        "나는 충분히 잘하고 있다",
-        "나는 사랑받을 자격이 있다",
-        "나는 내 꿈을 이룰 수 있다",
-        "나는 강하고 건강하다"
-    ),
-    val showSuggestions: Boolean = false,
     val maxWishLength: Int = 100,
     val minTargetCount: Int = 1,
     val maxTargetCount: Int = 10000,

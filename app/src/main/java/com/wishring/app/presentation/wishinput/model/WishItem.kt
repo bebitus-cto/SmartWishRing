@@ -37,8 +37,7 @@ data class WishItem(
      */
     fun toWishData(): WishData {
         return WishData(
-            text = text,
-            targetCount = targetCount
+            text = text
         )
     }
     
@@ -63,10 +62,10 @@ data class WishItem(
         /**
          * Create from WishData
          */
-        fun fromWishData(wishData: WishData): WishItem {
+        fun fromWishData(wishData: WishData, targetCount: Int = 1000): WishItem {
             return WishItem(
                 text = wishData.text,
-                targetCount = wishData.targetCount
+                targetCount = targetCount
             )
         }
     }
@@ -82,6 +81,6 @@ fun List<WishItem>.toWishDataList(): List<WishData> {
 /**
  * Extension function to convert List<WishData> to List<WishItem>
  */
-fun List<WishData>.toWishItemList(): List<WishItem> {
-    return this.map { WishItem.fromWishData(it) }
+fun List<WishData>.toWishItemList(targetCount: Int = 1000): List<WishItem> {
+    return this.map { WishItem.fromWishData(it, targetCount) }
 }

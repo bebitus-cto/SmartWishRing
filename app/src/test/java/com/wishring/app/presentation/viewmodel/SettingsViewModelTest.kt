@@ -2,8 +2,8 @@ package com.wishring.app.presentation.viewmodel
 
 import com.wishring.app.data.ble.model.BleConnectionState
 import com.wishring.app.data.local.repository.PreferencesRepository
-import com.wishring.app.domain.model.UserProfile
-import com.wishring.app.domain.repository.BleRepository
+import com.wishring.app.data.model.UserProfile
+import com.wishring.app.data.repository.BleRepository
 import com.wishring.app.presentation.settings.SettingsViewModel
 import com.wishring.app.presentation.settings.SettingsViewState
 import com.wishring.app.presentation.settings.SettingsEvent

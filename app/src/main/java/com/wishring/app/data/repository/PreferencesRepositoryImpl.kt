@@ -5,8 +5,12 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import com.wishring.app.core.util.Constants
-import com.wishring.app.domain.repository.PreferencesRepository
-import com.wishring.app.domain.repository.ThemeMode
+import com.wishring.app.data.repository.PreferencesRepository
+import com.wishring.app.data.repository.ThemeMode
+import com.wishring.app.data.model.ConnectedDevice
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.decodeFromString
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -51,6 +55,11 @@ class PreferencesRepositoryImpl @Inject constructor(
         val BLE_AUTO_CONNECT = booleanPreferencesKey("ble_auto_connect")
         val LAST_BLE_DEVICE = stringPreferencesKey("last_ble_device")
         val BLE_SYNC_INTERVAL = intPreferencesKey("ble_sync_interval")
+        val LAST_TIME_SYNC_DATE = stringPreferencesKey("last_time_sync_date")
+        
+        // Enhanced auto connect keys
+        val CONNECTED_DEVICE_JSON = stringPreferencesKey("connected_device_json")
+        val AUTO_CONNECT_ENABLED = booleanPreferencesKey("auto_connect_enabled")
     }
     
     override suspend fun getDefaultWishText(): String {
@@ -467,5 +476,128 @@ class PreferencesRepositoryImpl @Inject constructor(
         dataStore.edit { preferences ->
             preferences.clear()
         }
+    }
+    
+    override suspend fun getLastTimeSyncDate(): String? {
+        return dataStore.data
+            .catch { exception ->
+                if (exception is IOException) {
+                    emit(emptyPreferences())
+                } else {
+                    throw exception
+                }
+            }
+            .map { preferences ->
+                preferences[PreferenceKeys.LAST_TIME_SYNC_DATE]
+            }
+            .first()
+    }
+    
+    override suspend fun setLastTimeSyncDate(date: String) {
+        dataStore.edit { preferences ->
+            preferences[PreferenceKeys.LAST_TIME_SYNC_DATE] = date
+        }
+    }
+    
+    // ===== Enhanced Auto Connect Methods =====
+    
+    override suspend fun saveConnectedDevice(device: ConnectedDevice) {
+        dataStore.edit { preferences ->
+            val deviceJson = Json.encodeToString(device)
+            preferences[PreferenceKeys.CONNECTED_DEVICE_JSON] = deviceJson
+            // Also update legacy fields for backward compatibility
+            preferences[PreferenceKeys.LAST_BLE_DEVICE] = device.address
+        }
+    }
+    
+    override suspend fun saveConnectedDevice(deviceAddress: String, deviceName: String) {
+        val device = ConnectedDevice.create(deviceAddress, deviceName)
+        saveConnectedDevice(device)
+    }
+    
+    override suspend fun getLastConnectedDevice(): ConnectedDevice? {
+        return dataStore.data
+            .catch { exception ->
+                if (exception is IOException) {
+                    emit(emptyPreferences())
+                } else {
+                    throw exception
+                }
+            }
+            .map { preferences ->
+                val deviceJson = preferences[PreferenceKeys.CONNECTED_DEVICE_JSON]
+                if (deviceJson != null) {
+                    try {
+                        Json.decodeFromString<ConnectedDevice>(deviceJson)
+                    } catch (e: Exception) {
+                        // Fallback to legacy data if JSON parsing fails
+                        val address = preferences[PreferenceKeys.LAST_BLE_DEVICE]
+                        if (address != null) {
+                            ConnectedDevice.create(address, "Unknown Device")
+                        } else {
+                            null
+                        }
+                    }
+                } else {
+                    // Try to migrate from legacy data
+                    val address = preferences[PreferenceKeys.LAST_BLE_DEVICE]
+                    if (address != null) {
+                        ConnectedDevice.create(address, "Unknown Device")
+                    } else {
+                        null
+                    }
+                }
+            }
+            .first()
+    }
+    
+    override suspend fun clearConnectedDevice() {
+        dataStore.edit { preferences ->
+            preferences.remove(PreferenceKeys.CONNECTED_DEVICE_JSON)
+            preferences.remove(PreferenceKeys.LAST_BLE_DEVICE)
+        }
+    }
+    
+    override suspend fun isAutoConnectEnabled(): Boolean {
+        return dataStore.data
+            .catch { exception ->
+                if (exception is IOException) {
+                    emit(emptyPreferences())
+                } else {
+                    throw exception
+                }
+            }
+            .map { preferences ->
+                // Check new key first, fallback to legacy key
+                preferences[PreferenceKeys.AUTO_CONNECT_ENABLED] 
+                    ?: preferences[PreferenceKeys.BLE_AUTO_CONNECT] 
+                    ?: true // Default to true
+            }
+            .first()
+    }
+    
+    override suspend fun setAutoConnectEnabled(enabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[PreferenceKeys.AUTO_CONNECT_ENABLED] = enabled
+            // Also update legacy key for backward compatibility
+            preferences[PreferenceKeys.BLE_AUTO_CONNECT] = enabled
+        }
+    }
+    
+    override fun observeAutoConnectEnabled(): Flow<Boolean> {
+        return dataStore.data
+            .catch { exception ->
+                if (exception is IOException) {
+                    emit(emptyPreferences())
+                } else {
+                    throw exception
+                }
+            }
+            .map { preferences ->
+                // Check new key first, fallback to legacy key
+                preferences[PreferenceKeys.AUTO_CONNECT_ENABLED] 
+                    ?: preferences[PreferenceKeys.BLE_AUTO_CONNECT] 
+                    ?: true // Default to true
+            }
     }
 }

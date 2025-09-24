@@ -2,9 +2,8 @@ package com.wishring.app.data.local.database.dao
 
 import androidx.room.*
 import com.wishring.app.core.base.BaseDao
-import com.wishring.app.core.util.Constants
 import com.wishring.app.core.util.DateUtils
-import com.wishring.app.data.local.database.entity.WishCountEntity
+import com.wishring.app.data.local.database.entity.WishEntity
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -12,7 +11,7 @@ import kotlinx.coroutines.flow.Flow
  * Extends BaseDao for common CRUD operations
  */
 @Dao
-interface WishCountDao : BaseDao<WishCountEntity> {
+interface WishCountDao : BaseDao<WishEntity> {
     
     /**
      * Get wish count by date
@@ -20,14 +19,14 @@ interface WishCountDao : BaseDao<WishCountEntity> {
      * @return WishCountEntity or null if not found
      */
     @Query("SELECT * FROM wish_counts WHERE date = :date")
-    suspend fun getByDate(date: String): WishCountEntity?
+    suspend fun getByDate(date: String): WishEntity?
     
     /**
      * Get today's wish count
      * @return Today's WishCountEntity or null
      */
     @Query("SELECT * FROM wish_counts WHERE date = date('now', 'localtime')")
-    suspend fun getTodayRecord(): WishCountEntity?
+    suspend fun getTodayRecord(): WishEntity?
     
     /**
      * Get today's count as Flow
@@ -42,7 +41,7 @@ interface WishCountDao : BaseDao<WishCountEntity> {
      * @return Flow emitting WishCountEntity for the date
      */
     @Query("SELECT * FROM wish_counts WHERE date = :date")
-    fun observeByDate(date: String): Flow<WishCountEntity?>
+    fun observeByDate(date: String): Flow<WishEntity?>
     
     /**
      * Get recent records
@@ -50,14 +49,14 @@ interface WishCountDao : BaseDao<WishCountEntity> {
      * @return Flow of recent records
      */
     @Query("SELECT * FROM wish_counts ORDER BY date DESC LIMIT :limit")
-    fun getRecentRecords(limit: Int = 30): Flow<List<WishCountEntity>>
+    fun getRecentRecords(limit: Int = 30): Flow<List<WishEntity>>
     
     /**
      * Get all records
      * @return Flow of all records
      */
     @Query("SELECT * FROM wish_counts ORDER BY date DESC")
-    fun getAllRecords(): Flow<List<WishCountEntity>>
+    fun getAllRecords(): Flow<List<WishEntity>>
 
     
     /**
@@ -65,7 +64,7 @@ interface WishCountDao : BaseDao<WishCountEntity> {
      * @return List of all records
      */
     @Query("SELECT * FROM wish_counts ORDER BY date DESC")
-    suspend fun getAllRecordsSync(): List<WishCountEntity>
+    suspend fun getAllRecordsSync(): List<WishEntity>
     
     /**
      * Get records between dates
@@ -74,7 +73,7 @@ interface WishCountDao : BaseDao<WishCountEntity> {
      * @return List of records between dates
      */
     @Query("SELECT * FROM wish_counts WHERE date BETWEEN :startDate AND :endDate ORDER BY date DESC")
-    suspend fun getRecordsBetween(startDate: String, endDate: String): List<WishCountEntity>
+    suspend fun getRecordsBetween(startDate: String, endDate: String): List<WishEntity>
     
     /**
      * Update count for specific date
@@ -92,7 +91,7 @@ interface WishCountDao : BaseDao<WishCountEntity> {
     @Transaction
     suspend fun incrementTodayCount(increment: Int = 1) {
         val today = DateUtils.getTodayString()
-        val entity = getByDate(today) ?: WishCountEntity.createForToday()
+        val entity = getByDate(today) ?: WishEntity.createForToday()
         insert(entity.incrementCount(increment))
     }
     
@@ -104,7 +103,7 @@ interface WishCountDao : BaseDao<WishCountEntity> {
     @Transaction
     suspend fun updateTodayWish(wishText: String, targetCount: Int) {
         val today = DateUtils.getTodayString()
-        val entity = getByDate(today) ?: WishCountEntity.createForToday()
+        val entity = getByDate(today) ?: WishEntity.createForToday()
         insert(entity.updateWishAndTarget(wishText, targetCount))
     }
     

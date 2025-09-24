@@ -33,6 +33,7 @@ import androidx.navigation.compose.rememberNavController
 import com.manridy.sdk_mrd2019.Manridy
 import com.manridy.sdk_mrd2019.bean.send.SystemEnum
 import com.manridy.sdk_mrd2019.install.MrdPushCore
+import com.manridy.sdk_mrd2019.send.MrdSendRequest
 import com.wishring.app.ble.model.BatteryDataModel
 import com.wishring.app.core.util.SimpleBlePermissionManager
 import com.wishring.app.data.ble.model.BleConstants
@@ -272,9 +273,21 @@ class MainActivity : ComponentActivity() {
                 discoveryReceiver = null
             }
 
-            if (bluetoothAdapter?.isDiscovering == true) {
-                bluetoothAdapter?.cancelDiscovery()
-                Log.i(WR_EVENT, "[MainActivity] Classic Discovery 중지됨")
+            // 권한 체크 후 isDiscovering 확인
+            val hasPermission = try {
+                bluetoothAdapter?.isDiscovering
+                true
+            } catch (e: SecurityException) {
+                false
+            }
+            
+            if (hasPermission) {
+                if (bluetoothAdapter?.isDiscovering == true) {
+                    bluetoothAdapter?.cancelDiscovery()
+                    Log.i(WR_EVENT, "[MainActivity] Classic Discovery 중지됨")
+                }
+            } else {
+                Log.i(WR_EVENT, "[MainActivity] BLUETOOTH_SCAN 권한 없음 - Discovery 체크 스킵")
             }
         } catch (e: SecurityException) {
             Log.e(WR_EVENT, "[MainActivity] Discovery 중지 중 권한 오류", e)
@@ -320,6 +333,17 @@ class MainActivity : ComponentActivity() {
 
     private val gattCallback = object : BluetoothGattCallback() {
         override fun onConnectionStateChange(gatt: BluetoothGatt?, status: Int, newState: Int) {
+            // status 코드 디버깅
+            Log.i(WR_EVENT, "[MainActivity] onConnectionStateChange - status: $status, newState: $newState")
+            when (status) {
+                BluetoothGatt.GATT_SUCCESS -> Log.i(WR_EVENT, "[MainActivity] GATT 작업 성공")
+                133 -> Log.e(WR_EVENT, "[MainActivity] ❌ GATT ERROR 133: 연결 실패 - 기기 재시작 또는 페어링 필요")
+                8 -> Log.e(WR_EVENT, "[MainActivity] ❌ GATT ERROR 8: 연결 시간 초과")
+                19 -> Log.e(WR_EVENT, "[MainActivity] ❌ GATT ERROR 19: 기기에서 연결 거부")
+                22 -> Log.e(WR_EVENT, "[MainActivity] ❌ GATT ERROR 22: 기기가 연결 종료")
+                else -> Log.e(WR_EVENT, "[MainActivity] ❌ GATT ERROR $status")
+            }
+            
             when (newState) {
                 BluetoothProfile.STATE_CONNECTED -> {
                     Log.i(WR_EVENT, "[MainActivity] GATT 연결됨")
@@ -346,8 +370,23 @@ class MainActivity : ComponentActivity() {
                 }
 
                 BluetoothProfile.STATE_DISCONNECTED -> {
-                    Log.i(WR_EVENT, "[MainActivity] GATT 연결 끊김")
-
+                    Log.i(WR_EVENT, "[MainActivity] GATT 연결 끊김 (status: $status)")
+                    
+                    // 연결 실패 원인별 처리
+                    when (status) {
+                        133 -> {
+                            Log.e(WR_EVENT, "[MainActivity] 📱 ERROR 133 - 1초 후 재시도합니다...")
+                            lifecycleScope.launch {
+                                delay(1000)
+                                h13Device?.let {
+                                    Log.i(WR_EVENT, "[MainActivity] 재연결 시도...")
+                                    connectToDevice(it)
+                                }
+                            }
+                        }
+                        else -> Log.i(WR_EVENT, "[MainActivity] 연결 종료 (status: $status)")
+                    }
+                    
                     // H13 연결 상태 초기화 및 배터리 폴링 중지
                     isH13Connected = false
                     batteryPollingJob?.cancel()
@@ -454,6 +493,36 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        override fun onDescriptorWrite(
+            gatt: BluetoothGatt,
+            descriptor: BluetoothGattDescriptor,
+            status: Int
+        ) {
+            super.onDescriptorWrite(gatt, descriptor, status)
+            
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                Log.i(WR_EVENT, "[BATTERY_DEBUG] ✅ Descriptor 쓰기 성공: ${descriptor.uuid}")
+
+                if (descriptor.uuid == UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")) {
+                    Log.i(WR_EVENT, "[BATTERY_DEBUG] Notification 설정 완료!")
+
+                    lifecycleScope.launch {
+                        Log.i(WR_EVENT, "[BATTERY_DEBUG] 2. 초기 배터리 요청")
+                        requestBatteryLevel()
+
+                        Log.i(WR_EVENT, "[TIME_SYNC] 시간 동기화 테스트 시작")
+                        syncDeviceTime()
+                        
+                        Log.i(WR_EVENT, "[BATTERY_DEBUG] 4. 배터리 폴링 시작")
+                        startBatteryPolling()
+                        Log.i(WR_EVENT, "[BATTERY_DEBUG] ===== 초기화 완료 =====")
+                    }
+                }
+            } else {
+                Log.e(WR_EVENT, "[BATTERY_DEBUG] ❌ Descriptor 쓰기 실패: status=$status")
+            }
+        }
+
         override fun onServicesDiscovered(gatt: BluetoothGatt?, status: Int) {
             if (status == BluetoothGatt.GATT_SUCCESS && gatt != null) {
                 Log.i(WR_EVENT, "[MainActivity] 서비스 발견 완료")
@@ -463,26 +532,13 @@ class MainActivity : ComponentActivity() {
                     Log.i(WR_EVENT, "[MainActivity] ✅ H13 기기 확인됨 - 배터리 관련 기능 시작")
                     isH13Connected = true
 
-                    // MRD SDK가 서비스를 사용할 수 있도록 함
-                    // TODO: 실제 MRD SDK 통합시 주석 해제
-                    // mrdManager?.onServicesDiscovered()
-
-                    // H13 기기일 때만 배터리 레벨 요청
+                    // H13 기기일 때만 초기화 작업 시작
                     lifecycleScope.launch {
-                        // 1. Notification 설정 (중요!)
+                        // Notification 설정만 하고, 나머지는 onDescriptorWrite 콜백에서 처리
                         Log.i(WR_EVENT, "[BATTERY_DEBUG] ===== H13 서비스 발견 =====")
                         Log.i(WR_EVENT, "[BATTERY_DEBUG] 1. Notification 설정 시작")
                         setupNotifications(gatt)
-                        delay(500) // 안정화 대기
-
-                        // 2. 초기 배터리 요청
-                        Log.i(WR_EVENT, "[BATTERY_DEBUG] 2. 초기 배터리 요청")
-                        requestBatteryLevel()
-
-                        // 3. 배터리 폴링 시작
-                        Log.i(WR_EVENT, "[BATTERY_DEBUG] 3. 배터리 폴링 시작")
-                        startBatteryPolling()
-                        Log.i(WR_EVENT, "[BATTERY_DEBUG] ===== 초기화 완료 =====")
+                        // 나머지 작업은 onDescriptorWrite 콜백에서 자동 진행됨
                     }
                 } else {
                     Log.i(WR_EVENT, "[MainActivity] ❌ H13 기기가 아님 - 배터리 기능 비활성화")
@@ -492,12 +548,20 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // 디바이스 연결
+    // 디바이스 연결 (개선 버전)
     private fun connectToDevice(device: BluetoothDevice) {
         h13Device = device
         Log.i(WR_EVENT, "[MainActivity] 기기 연결 시작: ${device.address} - ${device.name ?: "Unknown"}")
+        
+        // 이전 연결 정리
+        bluetoothGatt?.let {
+            Log.i(WR_EVENT, "[MainActivity] 이전 GATT 연결 정리")
+            it.close()
+            bluetoothGatt = null
+        }
 
         try {
+            Log.i(WR_EVENT, "[MainActivity] connectGatt 호출 - autoConnect: false (즉시 연결)")
             bluetoothGatt = device.connectGatt(this, false, gattCallback)
         } catch (e: SecurityException) {
             Log.e(WR_EVENT, "[MainActivity] 블루투스 연결 권한 없음", e)
@@ -640,24 +704,16 @@ class MainActivity : ComponentActivity() {
 
     // 60초 배터리 폴링
     private fun startBatteryPolling() {
-        // 이미 폴링 중이면 중복 실행 방지
-        if (batteryPollingJob?.isActive == true) {
+        if (batteryPollingJob?.isActive == true || !isH13Connected) {
             Log.i(WR_EVENT, "[BATTERY_DEBUG] 배터리 폴링이 이미 실행 중")
-            return
-        }
-
-        // H13 기기가 아니면 폴링 시작하지 않음
-        if (!isH13Connected) {
-            Log.i(WR_EVENT, "[BATTERY_DEBUG] H13 기기가 아니므로 배터리 폴링 시작 안 함")
             return
         }
 
         Log.i(WR_EVENT, "[BATTERY_DEBUG] ===== H13 배터리 폴링 시작 =====")
         batteryPollingJob = lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                // 60초 간격으로 폴링
                 while (isActive && isH13Connected) {
-                    if (bluetoothGatt?.device != null && isH13Connected) {
+                    if (bluetoothGatt?.device != null) {
                         Log.i(WR_EVENT, "[BATTERY_DEBUG] ========================================")
                         Log.i(WR_EVENT, "[BATTERY_DEBUG] 60초 주기 배터리 요청")
                         Log.i(
@@ -767,12 +823,12 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        super.onDestroy()
         mainViewModel.stopBleScan()
         disconnectDevice()
+        super.onDestroy()
     }
 
-    // 디바이스 시간 동기화 (완전 개선 버전)
+    // 디바이스 시간 동기화 (테스트용 시간 버전)
     private suspend fun syncDeviceTime() {
         try {
             val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
@@ -781,27 +837,61 @@ class MainActivity : ComponentActivity() {
             if (lastSyncDate != today) {
                 Log.i(WR_EVENT, "[TIME_SYNC] ===== 시간 동기화 시작 =====")
 
-                // 1. 현재 시간 준비 (한국 시간대)
-                val calendar = Calendar.getInstance(TimeZone.getTimeZone("Asia/Seoul"))
-                val currentTime = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
-                    .format(calendar.time)
-                Log.i(WR_EVENT, "[TIME_SYNC] 설정할 시간: $currentTime")
+                // 테스트용 시간 설정: 2025년 3월 3일 오후 3시 33분 33초
+                val testCalendar = Calendar.getInstance(TimeZone.getTimeZone("Asia/Seoul")).apply {
+                    set(Calendar.YEAR, 2025)
+                    set(Calendar.MONTH, 2)  // 3월 (0부터 시작)
+                    set(Calendar.DAY_OF_MONTH, 3)
+                    set(Calendar.HOUR_OF_DAY, 15)  // 24시간 형식
+                    set(Calendar.MINUTE, 33)
+                    set(Calendar.SECOND, 33)
+                }
+
+                val testTimeString = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+                    .format(testCalendar.time)
+                Log.i(WR_EVENT, "[TIME_SYNC] 🕐 테스트 시간 설정: $testTimeString")
+                Log.i(
+                    WR_EVENT, "[TIME_SYNC] Year: ${testCalendar.get(Calendar.YEAR)}, " +
+                            "Month: ${testCalendar.get(Calendar.MONTH) + 1}, " +
+                            "Day: ${testCalendar.get(Calendar.DAY_OF_MONTH)}, " +
+                            "Hour: ${testCalendar.get(Calendar.HOUR_OF_DAY)}, " +
+                            "Minute: ${testCalendar.get(Calendar.MINUTE)}, " +
+                            "Second: ${testCalendar.get(Calendar.SECOND)}"
+                )
 
                 // 2. 디바이스에 시간 설정
-                val timeRequest = Manridy.getMrdSend().setTime(calendar)
+                val timeRequest = Manridy.getMrdSend().setTime(testCalendar)
+                if (timeRequest != null) {
+                    val dataSize = timeRequest.datas?.size ?: 0
+                    Log.i(WR_EVENT, "[TIME_SYNC] 시간 명령 데이터 크기: $dataSize bytes")
+                    if (dataSize > 0) {
+                        Log.d(WR_EVENT, "[TIME_SYNC] 데이터: ${timeRequest.datas.contentToString()}")
+                    }
+                }
                 val timeSuccess = sendTimeData(timeRequest, "시간 설정")
 
                 // 3. 24시간 형식 설정
-                val formatSuccess =
-                    sendTimeData(Manridy.getMrdSend().setHourSelect(0), "24시간 형식 설정")
+                val formatRequest = Manridy.getMrdSend().setHourSelect(0)
+                if (formatRequest != null) {
+                    val formatDataSize = formatRequest.datas?.size ?: 0
+                    Log.i(WR_EVENT, "[TIME_SYNC] 24시간 형식 명령 데이터 크기: $formatDataSize bytes")
+                }
+                val formatSuccess = sendTimeData(formatRequest, "24시간 형식 설정")
 
                 // 4. 설정 검증
                 if (timeSuccess && formatSuccess) {
-                    verifyTimeSettings(currentTime)
+                    verifyTimeSettings(testTimeString)
                     preferencesRepository.setLastTimeSyncDate(today)
-                    Log.i(WR_EVENT, "[TIME_SYNC] ✅ 시간 동기화 완료!")
+                    Log.i(WR_EVENT, "[TIME_SYNC] ✅ 시간 동기화 완료! 기기 시간을 확인하세요.")
+                    Log.i(
+                        WR_EVENT,
+                        "[TIME_SYNC] 예상 표시: 2025-03-03 15:33:33 또는 2025년 3월 3일 오후 3:33:33"
+                    )
                 } else {
-                    Log.e(WR_EVENT, "[TIME_SYNC] ❌ 시간 동기화 실패")
+                    Log.e(
+                        WR_EVENT,
+                        "[TIME_SYNC] ❌ 시간 동기화 실패 (시간: $timeSuccess, 형식: $formatSuccess)"
+                    )
                 }
 
                 Log.i(WR_EVENT, "[TIME_SYNC] ===========================")
@@ -813,34 +903,71 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // BLE 데이터 전송 헬퍼 메서드
+    // BLE 데이터 전송 헬퍼 메서드 (개선 버전)
     private suspend fun sendTimeData(request: Any?, operation: String): Boolean {
         return try {
-            if (request != null) {
-                bluetoothGatt?.let { gatt ->
-                    val service = gatt.getService(BleConstants.SERVICE_UUID)
-                    val writeChar = service?.getCharacteristic(BleConstants.WRITE_CHAR_UUID)
+            if (request == null) {
+                Log.w(WR_EVENT, "[TIME_SYNC] ⚠️ $operation - request가 null입니다")
+                return false
+            }
 
-                    if (writeChar != null) {
-                        writeChar.value =
-                            request.javaClass.getMethod("getDatas").invoke(request) as ByteArray
-                        val success = gatt.writeCharacteristic(writeChar)
+            // MrdSendRequest 타입 체크
+            val dataBytes = when (request) {
+                is com.manridy.sdk_mrd2019.send.MrdSendRequest -> {
+                    Log.d(WR_EVENT, "[TIME_SYNC] MrdSendRequest 타입 확인됨")
+                    request.datas
+                }
 
-                        if (success) {
-                            delay(200) // BLE 안정성을 위한 딜레이
-                            Log.i(WR_EVENT, "[TIME_SYNC] ✅ $operation 전송 성공")
-                            return true
-                        } else {
-                            Log.w(WR_EVENT, "[TIME_SYNC] ❌ $operation 전송 실패")
-                        }
-                    } else {
-                        Log.e(WR_EVENT, "[TIME_SYNC] ❌ Write characteristic not found")
+                else -> {
+                    // 폴백: 리플렉션 사용 (호환성을 위해 유지)
+                    Log.d(WR_EVENT, "[TIME_SYNC] 리플렉션 사용 (타입: ${request.javaClass.simpleName})")
+                    try {
+                        request.javaClass.getMethod("getDatas").invoke(request) as ByteArray
+                    } catch (e: Exception) {
+                        Log.e(WR_EVENT, "[TIME_SYNC] getDatas() 호출 실패", e)
+                        return false
                     }
                 }
             }
-            false
+
+            if (dataBytes == null || dataBytes.isEmpty()) {
+                Log.e(WR_EVENT, "[TIME_SYNC] ❌ $operation - 데이터가 비어있습니다")
+                return false
+            }
+
+            bluetoothGatt?.let { gatt ->
+                val service = gatt.getService(BleConstants.SERVICE_UUID)
+                if (service == null) {
+                    Log.e(WR_EVENT, "[TIME_SYNC] ❌ BLE 서비스를 찾을 수 없습니다")
+                    return false
+                }
+
+                val writeChar = service.getCharacteristic(BleConstants.WRITE_CHAR_UUID)
+                if (writeChar == null) {
+                    Log.e(WR_EVENT, "[TIME_SYNC] ❌ Write characteristic을 찾을 수 없습니다")
+                    return false
+                }
+
+                // 데이터 전송
+                writeChar.value = dataBytes
+                Log.d(WR_EVENT, "[TIME_SYNC] $operation - 전송할 데이터 크기: ${dataBytes.size} bytes")
+
+                val success = gatt.writeCharacteristic(writeChar)
+
+                if (success) {
+                    delay(200) // BLE 안정성을 위한 딜레이
+                    Log.i(WR_EVENT, "[TIME_SYNC] ✅ $operation 전송 성공")
+                    return true
+                } else {
+                    Log.w(WR_EVENT, "[TIME_SYNC] ❌ $operation 전송 실패")
+                    return false
+                }
+            } ?: run {
+                Log.e(WR_EVENT, "[TIME_SYNC] ❌ BluetoothGatt가 null입니다")
+                return false
+            }
         } catch (e: Exception) {
-            Log.e(WR_EVENT, "[TIME_SYNC] $operation 전송 오류", e)
+            Log.e(WR_EVENT, "[TIME_SYNC] $operation 전송 중 예외 발생", e)
             false
         }
     }

@@ -1,8 +1,7 @@
 package com.wishring.app.domain.usecase
 
-import com.wishring.app.domain.model.WishCount
-import com.wishring.app.domain.repository.WishCountRepository
-import com.wishring.app.core.util.DateUtils
+import com.wishring.app.data.model.WishUiState
+import com.wishring.app.data.repository.WishCountRepository
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
@@ -32,16 +31,16 @@ class IncrementDailyCountUseCaseTest {
     fun `execute should increment daily count successfully`() = runTest {
         // Given
         val amount = 1
-        val expectedWishCount = WishCount.createDefault().copy(totalCount = 1)
+        val expectedWishUiState = WishUiState.createDefault().copy(targetCount = 1)
         whenever(wishCountRepository.incrementTodayCount(amount))
-            .thenReturn(expectedWishCount)
+            .thenReturn(expectedWishUiState)
         
         // When
         val result = useCase.execute(amount)
         
         // Then
         assertTrue(result.isSuccess)
-        assertEquals(expectedWishCount, result.getOrNull())
+        assertEquals(expectedWishUiState, result.getOrNull())
         verify(wishCountRepository).incrementTodayCount(amount)
     }
     
@@ -65,9 +64,9 @@ class IncrementDailyCountUseCaseTest {
     @Test
     fun `execute should use default amount when not specified`() = runTest {
         // Given
-        val expectedWishCount = WishCount.createDefault().copy(totalCount = 1)
+        val expectedWishUiState = WishUiState.createDefault().copy(targetCount = 1)
         whenever(wishCountRepository.incrementTodayCount(1))
-            .thenReturn(expectedWishCount)
+            .thenReturn(expectedWishUiState)
         
         // When
         val result = useCase.execute() // No amount specified, should default to 1
@@ -81,16 +80,16 @@ class IncrementDailyCountUseCaseTest {
     fun `execute should handle large increment amounts`() = runTest {
         // Given
         val amount = 50
-        val expectedWishCount = WishCount.createDefault().copy(totalCount = 50)
+        val expectedWishUiState = WishUiState.createDefault().copy(targetCount = 50)
         whenever(wishCountRepository.incrementTodayCount(amount))
-            .thenReturn(expectedWishCount)
+            .thenReturn(expectedWishUiState)
         
         // When
         val result = useCase.execute(amount)
         
         // Then
         assertTrue(result.isSuccess)
-        assertEquals(expectedWishCount, result.getOrNull())
+        assertEquals(expectedWishUiState, result.getOrNull())
         verify(wishCountRepository).incrementTodayCount(amount)
     }
     
@@ -98,16 +97,16 @@ class IncrementDailyCountUseCaseTest {
     fun `execute should handle zero increment gracefully`() = runTest {
         // Given
         val amount = 0
-        val expectedWishCount = WishCount.createDefault().copy(totalCount = 0)
+        val expectedWishUiState = WishUiState.createDefault().copy(targetCount = 0)
         whenever(wishCountRepository.incrementTodayCount(amount))
-            .thenReturn(expectedWishCount)
+            .thenReturn(expectedWishUiState)
         
         // When
         val result = useCase.execute(amount)
         
         // Then
         assertTrue(result.isSuccess)
-        assertEquals(expectedWishCount, result.getOrNull())
+        assertEquals(expectedWishUiState, result.getOrNull())
         verify(wishCountRepository).incrementTodayCount(amount)
     }
     
@@ -115,16 +114,16 @@ class IncrementDailyCountUseCaseTest {
     fun `execute should handle negative increment amounts`() = runTest {
         // Given
         val amount = -1
-        val expectedWishCount = WishCount.createDefault().copy(totalCount = 0) // Assuming repository handles negative properly
+        val expectedWishUiState = WishUiState.createDefault().copy(targetCount = 0) // Assuming repository handles negative properly
         whenever(wishCountRepository.incrementTodayCount(amount))
-            .thenReturn(expectedWishCount)
+            .thenReturn(expectedWishUiState)
         
         // When
         val result = useCase.execute(amount)
         
         // Then
         assertTrue(result.isSuccess)
-        assertEquals(expectedWishCount, result.getOrNull())
+        assertEquals(expectedWishUiState, result.getOrNull())
         verify(wishCountRepository).incrementTodayCount(amount)
     }
 }

@@ -3,7 +3,7 @@ package com.wishring.app.domain.model
 import com.google.common.truth.Truth.assertThat
 import com.wishring.app.core.util.Constants
 import com.wishring.app.core.util.DateUtils
-import com.wishring.app.data.local.database.entity.WishCountEntity
+import com.wishring.app.data.local.database.entity.WishEntity
 import io.kotest.property.Arb
 import io.kotest.property.arbitrary.*
 import io.kotest.property.checkAll
@@ -14,9 +14,6 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 
 /**
  * Comprehensive test suite for WishCount domain model
@@ -315,7 +312,7 @@ class WishCountTest {
         @Test
         @DisplayName("WishCountEntity에서 WishCount로 변환되어야 함")
         fun `fromEntity should convert WishCountEntity to WishCount`() {
-            val entity = WishCountEntity(
+            val entity = WishEntity(
                 date = TEST_DATE,
                 totalCount = 75,
                 wishText = TEST_WISH_TEXT,
