@@ -1,6 +1,6 @@
 package com.wishring.app.presentation.wishinput
 
-import java.util.UUID
+import java.time.LocalDate
 
 /**
  * User events for WishInput screen
@@ -16,23 +16,23 @@ sealed class WishInputEvent {
     
     /**
      * Remove wish from the list
-     * @param wishId ID of the wish to remove
+     * @param index Index of the wish to remove
      */
-    data class RemoveWish(val wishId: UUID) : WishInputEvent()
+    data class RemoveWish(val index: Int) : WishInputEvent()
     
     /**
      * Update specific wish text
-     * @param wishId ID of the wish to update
+     * @param index Index of the wish to update
      * @param text New wish text
      */
-    data class UpdateWishText(val wishId: UUID, val text: String) : WishInputEvent()
+    data class UpdateWishText(val index: Int, val text: String) : WishInputEvent()
     
     /**
      * Update specific wish target count
-     * @param wishId ID of the wish to update  
+     * @param index Index of the wish to update  
      * @param count New target count
      */
-    data class UpdateWishCount(val wishId: UUID, val count: Int) : WishInputEvent()
+    data class UpdateWishCount(val index: Int, val count: Int) : WishInputEvent()
     
     /**
      * Save wish

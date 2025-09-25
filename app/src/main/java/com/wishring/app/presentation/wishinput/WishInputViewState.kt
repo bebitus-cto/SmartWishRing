@@ -1,6 +1,7 @@
 package com.wishring.app.presentation.wishinput
 
-import com.wishring.app.presentation.wishinput.model.WishItem
+import com.wishring.app.data.model.WishDayUiState
+import java.time.LocalDate
 
 /**
  * ViewState for WishInput screen
@@ -8,7 +9,7 @@ import com.wishring.app.presentation.wishinput.model.WishItem
  */
 data class WishInputViewState(
     val isLoading: Boolean = false,
-    val wishes: List<WishItem> = listOf(WishItem.createEmpty()),
+    val wishes: List<WishDayUiState> = listOf(WishDayUiState.empty(LocalDate.now())),
     val date: String = "",
     val isEditMode: Boolean = false,
     val existingRecord: Boolean = false,
@@ -25,7 +26,7 @@ data class WishInputViewState(
      * Check if save is enabled (at least one valid wish)
      */
     val isSaveEnabled: Boolean
-        get() = wishes.any { it.isValid } && !isSaving
+        get() = wishes.any { it.wishText.isNotBlank() && it.targetCount > 0 } && !isSaving
     
     /**
      * Check if can add more wishes
@@ -43,7 +44,7 @@ data class WishInputViewState(
      * Get count of valid wishes
      */
     val validWishCount: Int
-        get() = wishes.count { it.isValid }
+        get() = wishes.count { it.wishText.isNotBlank() && it.targetCount > 0 }
     
     /**
      * Check if maximum wishes reached

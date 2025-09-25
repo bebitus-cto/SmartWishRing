@@ -10,8 +10,8 @@ val Purple_Medium = Color(0xFF6A5ACD)   // 중간 보라색 (로고 색상)
 
 // Background Colors
 val Background_Primary = Color(0xFFFFFFFF)  // 흰색 배경
-val Background_Secondary = Color(0xFFF5F7FF)  // 연한 보라 배경 (#F5F7FF from Figma)
-val Background_Card = Color(0xFFFAFAFA)     // 카드 배경
+val Background_Secondary = Color(0xFFF6F7FF)  // 연한 보라 배경
+val Background_Card = Color(0xFFFFFFFF)     // 카드 배경
 
 // Text Colors
 val Text_Primary = Color(0xFF333333)    // 주요 텍스트 (#333333 from Figma)

@@ -8,11 +8,6 @@ package com.wishring.app.presentation.home
 sealed class HomeEvent {
 
     /**
-     * Load initial data
-     */
-    object LoadData : HomeEvent()
-
-    /**
      * Navigate to wish input screen
      */
     object NavigateToWishInput : HomeEvent()
@@ -28,33 +23,4 @@ sealed class HomeEvent {
      * Share achievement (show dialog)
      */
     object ShareAchievement : HomeEvent()
-
-    /**
-     * Confirm share with message and hashtags
-     * @param message Share message
-     * @param hashtags Hashtags to include
-     */
-    data class ConfirmShare(val message: String, val hashtags: String) : HomeEvent()
-
-    /**
-     * Dismiss share dialog
-     */
-    object DismissShareDialog : HomeEvent()
-
-    /**
-     * Dismiss error
-     */
-    object DismissError : HomeEvent()
-
-    /**
-     * Handle button press from device
-     * @param pressCount Number of presses
-     */
-    data class HandleDeviceButtonPress(val pressCount: Int) : HomeEvent()
-
-    /**
-     * Update battery level from device
-     * @param level Battery level percentage (0-100) or null
-     */
-    data class UpdateBatteryLevel(val level: Int?) : HomeEvent()
 }

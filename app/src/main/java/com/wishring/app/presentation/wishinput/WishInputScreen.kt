@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.wishring.app.R
-import com.wishring.app.presentation.component.WishCard
+import com.wishring.app.presentation.component.WishCardItem
 import com.wishring.app.presentation.wishinput.component.NumberPickerDialog
 
 /**
@@ -39,7 +39,7 @@ fun WishInputScreen(
     viewModel: WishInputViewModel = hiltViewModel()
 ) {
     val viewState by viewModel.uiState.collectAsStateWithLifecycle()
-    
+
     // Handle effects
     LaunchedEffect(Unit) {
         viewModel.effect.collect { effect ->
@@ -49,18 +49,20 @@ fun WishInputScreen(
                 is WishInputEffect.ShowToast -> {
                     // Show toast message
                 }
+
                 is WishInputEffect.ShowValidationError -> {
                     // Show validation error
                 }
+
                 else -> {
                     // Handle other effects
                 }
             }
         }
     }
-    
+
     Scaffold(
-        containerColor = Color(0xFFFAF5FF),
+        containerColor = Color(0xFFF6F7FF),
         topBar = {
             WishInputTopBar(
                 onBackClick = { viewModel.onEvent(WishInputEvent.NavigateBack) }
@@ -96,11 +98,82 @@ fun WishInputScreen(
             }
         }
     ) { paddingValues ->
-        WishInputContent(
-            viewState = viewState,
-            onEvent = viewModel::onEvent,
-            modifier = Modifier.padding(paddingValues)
-        )
+        Box(modifier = Modifier.fillMaxSize()) {
+            WishInputContent(
+                viewState = viewState,
+                onEvent = viewModel::onEvent,
+                modifier = Modifier.padding(paddingValues)
+            )
+
+            // Loading overlay
+            if (viewState.isLoading) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.5f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Card(
+                        modifier = Modifier.padding(32.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            CircularProgressIndicator(
+                                color = Color(0xFF6A5ACD),
+                                modifier = Modifier.size(32.dp)
+                            )
+                            Text(
+                                text = if (viewState.existingRecord) "기존 위시를 불러오는 중..." else "위시를 저장하는 중...",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color(0xFF333333)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Error snackbar
+            viewState.error?.let { errorMessage ->
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.BottomCenter)
+                        .padding(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color(0xFFFFEBEE)
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = errorMessage,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFFD32F2F),
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(
+                            onClick = { viewModel.onEvent(WishInputEvent.DismissError) }
+                        ) {
+                            Text(
+                                text = "닫기",
+                                color = Color(0xFFD32F2F),
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -144,151 +217,140 @@ internal fun WishInputContent(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFFAF5FF))
+            .background(Color(0xFFF6F7FF))
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 17.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 17.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // Section 1: 위시 입력 카드
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = Color.White
+            ),
+            elevation = CardDefaults.cardElevation(1.dp),
+            shape = RoundedCornerShape(5.dp)
         ) {
-            Spacer(modifier = Modifier.height(20.dp))
-            
-            // Section 1: 위시 입력 카드
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color.White
-                ),
-                elevation = CardDefaults.cardElevation(1.dp),
-                shape = RoundedCornerShape(5.dp)
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    // Section title
-                    Text(
-                        text = "1. 원하는 것을 적어보세요",
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold
-                        ),
-                        color = Color(0xFF333333)
+                // Section title
+                Text(
+                    text = "1. 원하는 것을 적어보세요",
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold
+                    ),
+                    color = Color(0xFF333333)
+                )
+
+                // Wish cards using the WishCardItem component
+                viewState.wishes.forEachIndexed { index, wish ->
+                    WishCardItem(
+                        wishText = wish.wishText,
+                        isEditMode = true,
+                        showTargetCount = false,
+                        placeholder = "(예: 확언문장, 기도문, 이루고 싶은 목표)",
+                        onTextChange = { text ->
+                            onEvent(WishInputEvent.UpdateWishText(index, text))
+                        },
+                        onDelete = if (viewState.canRemoveWishes) {
+                            { onEvent(WishInputEvent.RemoveWish(index)) }
+                        } else null,
+                        showDeleteButton = viewState.canRemoveWishes,
+                        modifier = Modifier.fillMaxWidth()
                     )
-                    
-                    // Wish cards using the actual WishCard component
-                    viewState.wishes.forEachIndexed { index, wish ->
-                        WishCard(
-                            wishText = wish.text,
-                            isInputMode = true,
-                            showTargetCount = false,
-                            placeholder = "소원 ${index + 1}을 입력하세요... (예: 확언문장, 기도문, 이루고 싶은 목표)",
-                            onTextChange = { text ->
-                                onEvent(WishInputEvent.UpdateWishText(wish.id, text))
-                            },
-                            onDelete = if (viewState.canRemoveWishes) {
-                                { onEvent(WishInputEvent.RemoveWish(wish.id)) }
-                            } else null,
-                            showDeleteButton = viewState.canRemoveWishes,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                    
-                    // Add wish button
-                    if (viewState.canAddMoreWishes) {
-                        OutlinedButton(
+                }
+
+                // Add wish button
+                if (viewState.canAddMoreWishes) {
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        IconButton(
                             onClick = { onEvent(WishInputEvent.AddWish()) },
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp),
-                            shape = RoundedCornerShape(5.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = Color(0xFF6A5ACD)
-                            ),
-                            border = ButtonDefaults.outlinedButtonBorder.copy(
-                                brush = androidx.compose.ui.graphics.SolidColor(Color(0xFFF0F0F0))
-                            )
+                                .size(40.dp)
+                                .background(
+                                    color = Color(0xFF6A5ACD).copy(alpha = 0.1f),
+                                    shape = RoundedCornerShape(20.dp)
+                                )
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Add,
                                 contentDescription = "Add wish",
-                                modifier = Modifier.size(16.dp),
+                                modifier = Modifier.size(24.dp),
                                 tint = Color(0xFF6A5ACD)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "위시 추가",
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium
-                                ),
-                                color = Color(0xFF6A5ACD)
                             )
                         }
                     }
                 }
             }
-            
-            // Section 2: 목표 횟수 입력 카드
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color.White
-                ),
-                elevation = CardDefaults.cardElevation(1.dp),
-                shape = RoundedCornerShape(5.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    // Section title
-                    Text(
-                        text = "2. 목표 횟수를 입력하세요.",
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold
-                        ),
-                        color = Color(0xFF333333)
-                    )
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    // Target count input
-                    TargetCountInput(
-                        targetCount = if (viewState.wishes.isNotEmpty()) viewState.wishes.first().targetCount else 1000,
-                        onTargetCountChange = { count ->
-                            // Update target count for all wishes
-                            viewState.wishes.forEach { wish ->
-                                onEvent(WishInputEvent.UpdateWishCount(wish.id, count))
-                            }
-                        },
-                        placeholder = "작은 반복이 큰 변화를 만듭니다. (예: 100회, 1,000회, 10,000회)"
-                    )
-                }
-            }
-            
-            // Bottom spacing
-            Spacer(modifier = Modifier.height(20.dp))
         }
-        
+
+        // Section 2: 목표 횟수 입력 카드
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = Color.White
+            ),
+            elevation = CardDefaults.cardElevation(1.dp),
+            shape = RoundedCornerShape(5.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Section title
+                Text(
+                    text = "2. 목표 횟수를 입력하세요.",
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold
+                    ),
+                    color = Color(0xFF333333)
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Target count input
+                TargetCountInput(
+                    targetCount = if (viewState.wishes.isNotEmpty()) viewState.wishes.first().targetCount else 1000,
+                    onTargetCountChange = { count ->
+                        // Update target count for all wishes
+                        viewState.wishes.forEachIndexed { index, _ ->
+                            onEvent(WishInputEvent.UpdateWishCount(index, count))
+                        }
+                    },
+                    placeholder = "작은 반복이 큰 변화를 만듭니다. (예: 100회, 1,000회, 10,000회)"
+                )
+            }
+        }
+
+        // Bottom spacing before background image
+        Spacer(modifier = Modifier.height(20.dp))
+
         // Background image at bottom
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(127.dp)
+                .height(127.dp),
+            contentAlignment = Alignment.Center
         ) {
             Image(
                 painter = painterResource(id = R.drawable.input_background_32926f),
                 contentDescription = null,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .size(169.dp, 127.dp),
+                modifier = Modifier.size(169.dp, 127.dp),
                 contentScale = ContentScale.Fit
             )
         }
+
+        // Additional bottom padding for bottomBar
+        Spacer(modifier = Modifier.height(80.dp))
     }
 }
 
@@ -299,44 +361,49 @@ private fun TargetCountInput(
     placeholder: String = "1000"
 ) {
     var showDialog by remember { mutableStateOf(false) }
-    
+
     Column(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        OutlinedTextField(
-            value = targetCount.toString(),
-            onValueChange = { /* Read-only */ },
-            placeholder = {
-                Text(
-                    text = "(작은 반복이 큰 변화를 만듭니다. / 예: 100회, 1,000회, 10,000회)",
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        fontSize = 11.sp
-                    ),
-                    color = Color(0xFF333333).copy(alpha = 0.5f)
-                )
-            },
-            textStyle = MaterialTheme.typography.bodyMedium.copy(
-                fontSize = 14.sp,
-                color = Color(0xFF333333)
-            ),
-            singleLine = true,
-            readOnly = true,
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { showDialog = true },
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Color(0xFFE0E0E0),
-                unfocusedBorderColor = Color(0xFFF0F0F0),
-                focusedContainerColor = Color(0xFFF9FBFF),
-                unfocusedContainerColor = Color(0xFFF9FBFF),
-                disabledBorderColor = Color(0xFFF0F0F0),
-                disabledContainerColor = Color(0xFFF9FBFF),
-                disabledTextColor = Color(0xFF333333)
-            ),
-            shape = RoundedCornerShape(5.dp)
-        )
+                .clickable { showDialog = true }
+        ) {
+            OutlinedTextField(
+                value = targetCount.toString(),
+                onValueChange = { /* Read-only */ },
+                placeholder = {
+                    Text(
+                        text = "(작은 반복이 큰 변화를 만듭니다. / 예: 100회, 1,000회, 10,000회)",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontSize = 11.sp
+                        ),
+                        color = Color(0xFF333333).copy(alpha = 0.5f)
+                    )
+                },
+                textStyle = MaterialTheme.typography.bodyMedium.copy(
+                    fontSize = 14.sp,
+                    color = Color(0xFF333333)
+                ),
+                singleLine = true,
+                readOnly = true,
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Color(0xFFE0E0E0),
+                    unfocusedBorderColor = Color(0xFFF0F0F0),
+                    focusedContainerColor = Color(0xFFF9FBFF),
+                    unfocusedContainerColor = Color(0xFFF9FBFF),
+                    disabledBorderColor = Color(0xFFF0F0F0),
+                    disabledContainerColor = Color(0xFFF9FBFF),
+                    disabledTextColor = Color(0xFF333333)
+                ),
+                shape = RoundedCornerShape(5.dp),
+                enabled = false
+            )
+        }
     }
-    
+
     if (showDialog) {
         NumberPickerDialog(
             currentValue = targetCount,

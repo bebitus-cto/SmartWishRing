@@ -1,7 +1,6 @@
 package com.wishring.app.performance
 
 import com.wishring.app.data.model.WishUiState
-import com.wishring.app.data.model.DailyRecord
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*

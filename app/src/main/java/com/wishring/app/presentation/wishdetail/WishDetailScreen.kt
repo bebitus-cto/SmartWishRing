@@ -2,31 +2,29 @@ package com.wishring.app.presentation.wishdetail
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.wishring.app.R
+import com.wishring.app.presentation.component.WishCardItem
 import com.wishring.app.ui.theme.*
-import java.time.LocalDate
 
 /**
  * Simplified WishDetail screen matching Figma design
@@ -35,7 +33,6 @@ import java.time.LocalDate
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WishDetailScreen(
-    initialDate: String? = null,
     onNavigateBack: () -> Unit = {},
     viewModel: WishDetailViewModel = hiltViewModel()
 ) {
@@ -57,6 +54,7 @@ fun WishDetailScreen(
         containerColor = Background_Secondary,
         topBar = {
             WishDetailTopBar(
+                displayDate = uiState.displayDate,
                 onBackClick = { viewModel.onEvent(WishDetailEvent.NavigateBack) }
             )
         }
@@ -70,7 +68,7 @@ fun WishDetailScreen(
 }
 
 @Composable
-private fun WishDetailContent(
+internal fun WishDetailContent(
     uiState: WishDetailViewState,
     onEvent: (WishDetailEvent) -> Unit,
     modifier: Modifier = Modifier
@@ -80,13 +78,6 @@ private fun WishDetailContent(
             .fillMaxSize()
             .background(Background_Secondary)
     ) {
-        // Date selector header
-        DateSelectorHeader(
-            displayDate = uiState.displayDate,
-            onPreviousClick = { onEvent(WishDetailEvent.NavigateToPreviousDate) },
-            onNextClick = { onEvent(WishDetailEvent.NavigateToNextDate) }
-        )
-
         // Scrollable content
         Column(
             modifier = Modifier
@@ -103,9 +94,9 @@ private fun WishDetailContent(
 
             // Wish and motivational message cards
             uiState.allMessages.forEachIndexed { index, message ->
-                MessageCard(
-                    message = message,
-                    backgroundColor = if (index == 2) Color(0xFFFAFAFA) else Color.White
+                WishCardItem(
+                    wishText = message,
+                    isEditMode = false
                 )
             }
 
@@ -122,7 +113,7 @@ private fun WishDetailContent(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
-            CircularProgressIndicator(color = Purple_Medium)
+            CircularProgressIndicator(color = Text_Primary)
         }
     }
 
@@ -137,68 +128,33 @@ private fun WishDetailContent(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun WishDetailTopBar(
+    displayDate: String,
     onBackClick: () -> Unit
 ) {
-    TopAppBar(
-        title = { },
+    CenterAlignedTopAppBar(
+        title = {
+            Text(
+                text = displayDate,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
+                ),
+                color = Text_Primary
+            )
+        },
         navigationIcon = {
             IconButton(onClick = onBackClick) {
                 Icon(
-                    imageVector = Icons.Default.ArrowBack,
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Back",
                     tint = Text_Primary
                 )
             }
         },
-        colors = TopAppBarDefaults.topAppBarColors(
+        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
             containerColor = Background_Secondary
         )
     )
-}
-
-@Composable
-private fun DateSelectorHeader(
-    displayDate: String,
-    onPreviousClick: () -> Unit,
-    onNextClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(50.dp)
-            .background(Color.White)
-            .border(width = 0.5.dp, color = Color(0xFFC0C0C0)),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center
-    ) {
-        IconButton(
-            onClick = onPreviousClick,
-            modifier = Modifier.padding(start = 17.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.ArrowBack,
-                contentDescription = "Previous Date",
-                tint = Text_Primary
-            )
-        }
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        Text(
-            text = displayDate,
-            style = MaterialTheme.typography.bodyMedium.copy(
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium
-            ),
-            color = Text_Primary,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        // Empty space for symmetry
-        Spacer(modifier = Modifier.width(48.dp))
-    }
 }
 
 @Composable
@@ -209,17 +165,23 @@ private fun CountDisplayCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(162.dp),
+            .height(162.dp)
+            .shadow(
+                elevation = 3.dp,
+                shape = RoundedCornerShape(5.dp),
+                spotColor = Color(0x1A000000)
+            ),
         shape = RoundedCornerShape(5.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White
+        )
     ) {
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
             if (isLoading) {
-                CircularProgressIndicator(color = Purple_Medium)
+                CircularProgressIndicator(color = Text_Primary)
             } else {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -267,36 +229,6 @@ private fun CountDisplayCard(
     }
 }
 
-@Composable
-private fun MessageCard(
-    message: String,
-    backgroundColor: Color = Color.White
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(45.dp),
-        shape = RoundedCornerShape(5.dp),
-        colors = CardDefaults.cardColors(containerColor = backgroundColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp),
-            contentAlignment = Alignment.CenterStart
-        ) {
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodySmall.copy(
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium
-                ),
-                color = Text_Primary
-            )
-        }
-    }
-}
 
 @Composable
 private fun CharacterImagesRow() {
@@ -307,7 +239,7 @@ private fun CharacterImagesRow() {
         Card(
             modifier = Modifier.size(84.dp, 115.dp),
             shape = RoundedCornerShape(5.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             Image(
                 painter = painterResource(id = R.drawable.character_white),
@@ -317,12 +249,12 @@ private fun CharacterImagesRow() {
             )
         }
 
-        Spacer(modifier = Modifier.width(26.dp))
+        Spacer(modifier = Modifier.width(16.dp))
 
         Card(
             modifier = Modifier.size(89.dp, 115.dp),
             shape = RoundedCornerShape(5.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             Image(
                 painter = painterResource(id = R.drawable.character_black),
@@ -334,25 +266,4 @@ private fun CharacterImagesRow() {
     }
 }
 
-@Preview(showBackground = true, device = "id:pixel_5")
-@Composable
-fun WishDetailScreenPreview() {
-    WishRingTheme {
-        val previewState = WishDetailViewState(
-            selectedDate = LocalDate.of(2025, 8, 21),
-            targetCount = 1000,
-            wishText = "나는 매일 성장하고 있다",
-            motivationalMessages = listOf(
-                "나는 어제보다 더 나은 내가 되고 있다.",
-                "오늘의 선택이 나를 더 단단하게 만든다.",
-                "내 안의 가능성은 멈추지 않고 자라고 있다."
-            ),
-            isLoading = false
-        )
-
-        WishDetailContent(
-            uiState = previewState,
-            onEvent = {}
-        )
-    }
-}
+// Preview moved to preview/ package

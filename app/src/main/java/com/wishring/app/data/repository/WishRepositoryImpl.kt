@@ -4,7 +4,7 @@ import com.wishring.app.core.util.DateUtils
 import com.wishring.app.data.local.database.dao.WishDao
 import com.wishring.app.data.local.database.entity.WishEntity
 import com.wishring.app.data.local.database.entity.WishData
-import com.wishring.app.data.model.DailyRecord
+import com.wishring.app.data.model.WishDayUiState
 import com.wishring.app.data.model.WishUiState
 import com.wishring.app.data.model.toEntity
 import kotlinx.coroutines.flow.Flow
@@ -59,11 +59,11 @@ class WishRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun getDailyRecords(limit: Int): List<DailyRecord> {
+    override suspend fun getWishDays(limit: Int): List<WishDayUiState> {
         val wishCounts = wishDao.getRecentRecords(limit).first()
         return wishCounts.map { entity ->
             val wishUiState = WishUiState.fromEntity(entity)
-            DailyRecord.fromWishCount(wishUiState)
+            WishDayUiState.fromWishCount(wishUiState)
         }
     }
 
@@ -146,11 +146,11 @@ class WishRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun getDailyRecord(date: String): DailyRecord? {
+    override suspend fun getWishDay(date: String): WishDayUiState? {
         val wishUiState = wishDao.getByDate(date)?.let { WishUiState.fromEntity(it) }
             ?: return null
 
-        return DailyRecord.fromWishCount(wishUiState)
+        return WishDayUiState.fromWishCount(wishUiState)
     }
 
     override suspend fun saveWishCount(wishUiState: WishUiState): WishUiState {
@@ -231,5 +231,23 @@ class WishRepositoryImpl @Inject constructor(
         val today = DateUtils.getTodayString()
         val existing = wishDao.getByDate(today)
         return existing?.parseWishes() ?: emptyList()
+    }
+
+    override suspend fun getWishHistoryPaginated(page: Int, pageSize: Int): Pair<List<WishDayUiState>, com.wishring.app.presentation.home.PageInfo> {
+        val offset = page * pageSize
+        val totalCount = wishDao.getTotalCount()
+        
+        val entities = wishDao.getAllPaginated(limit = pageSize, offset = offset)
+        val dailyRecords = entities.map { entity ->
+            WishDayUiState.fromWishCount(WishUiState.fromEntity(entity))
+        }
+        
+        val pageInfo = com.wishring.app.presentation.home.PageInfo(
+            currentPage = page,
+            hasNextPage = (offset + pageSize) < totalCount,
+            totalItems = totalCount
+        )
+        
+        return Pair(dailyRecords, pageInfo)
     }
 }

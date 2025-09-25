@@ -4,114 +4,118 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.tooling.preview.Preview
 import com.wishring.app.presentation.wishinput.WishInputContent
 import com.wishring.app.presentation.wishinput.WishInputViewState
-import com.wishring.app.presentation.wishinput.model.WishItem
+import com.wishring.app.data.model.WishDayUiState
+import java.time.LocalDate
 import com.wishring.app.ui.theme.WishRingTheme
 
 /**
- * State-related previews for WishInput screen
+ * Various state preview states for WishInputScreen
  */
 
-@Preview(showBackground = true, device = "id:pixel_5", name = "Saving State")
+@Preview(showBackground = true, name = "Delete Confirmation Dialog")
 @Composable
-fun WishInputScreenSavingPreview() {
+fun WishInputDeleteConfirmationPreview() {
     WishRingTheme {
         val previewState = WishInputViewState(
             wishes = listOf(
-                WishItem.create(
-                    text = "저장 중인 소원",
-                    targetCount = 1000
+                WishDayUiState(
+                    date = LocalDate.now(),
+                    wishText = "삭제될 위시",
+                    isCompleted = false,
+                    targetCount = 1000,
+                    completedCount = 500
                 )
             ),
-            isSaving = true,
-            isLoading = false
-        )
-        
-        WishInputContent(
-            viewState = previewState,
-            onEvent = {}
-        )
-    }
-}
-
-@Preview(showBackground = true, device = "id:pixel_5", name = "Error State")
-@Composable
-fun WishInputScreenErrorPreview() {
-    WishRingTheme {
-        val previewState = WishInputViewState(
-            wishes = listOf(
-                WishItem.create(
-                    text = "문제가 있는 소원",
-                    targetCount = 1000
-                )
-            ),
-            error = "위시 저장에 실패했습니다",
-            isSaving = false
-        )
-        
-        WishInputContent(
-            viewState = previewState,
-            onEvent = {}
-        )
-    }
-}
-
-@Preview(showBackground = true, device = "id:pixel_5", name = "Edit Mode")
-@Composable
-fun WishInputScreenEditModePreview() {
-    WishRingTheme {
-        val previewState = WishInputViewState(
-            wishes = listOf(
-                WishItem.create(
-                    text = "수정 중인 기존 소원",
-                    targetCount = 2000
-                )
-            ),
-            isEditMode = true,
-            existingRecord = true
-        )
-        
-        WishInputContent(
-            viewState = previewState,
-            onEvent = {}
-        )
-    }
-}
-
-@Preview(showBackground = true, device = "id:pixel_5", name = "Delete Confirmation")
-@Composable
-fun WishInputScreenDeleteConfirmationPreview() {
-    WishRingTheme {
-        val previewState = WishInputViewState(
-            wishes = listOf(
-                WishItem.create(
-                    text = "삭제할 소원",
-                    targetCount = 1500
-                )
-            ),
-            isEditMode = true,
-            existingRecord = true,
+            isLoading = false,
             showDeleteConfirmation = true
         )
         
         WishInputContent(
             viewState = previewState,
-            onEvent = {}
+            onEvent = { }
         )
     }
 }
 
-@Preview(showBackground = true, device = "id:pixel_5", name = "Loading State")
+@Preview(showBackground = true, name = "Save Disabled")
 @Composable
-fun WishInputScreenLoadingPreview() {
+fun WishInputSaveDisabledPreview() {
     WishRingTheme {
         val previewState = WishInputViewState(
-            wishes = listOf(WishItem.createEmpty()),
-            isLoading = true
+            wishes = listOf(
+                WishDayUiState.empty(LocalDate.now())
+            ),
+            isLoading = false
         )
         
         WishInputContent(
             viewState = previewState,
-            onEvent = {}
+            onEvent = { }
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Save Enabled")
+@Composable
+fun WishInputSaveEnabledPreview() {
+    WishRingTheme {
+        val previewState = WishInputViewState(
+            wishes = listOf(
+                WishDayUiState(
+                    date = LocalDate.now(),
+                    wishText = "유효한 위시 텍스트",
+                    isCompleted = false,
+                    targetCount = 1000,
+                    completedCount = 0
+                )
+            ),
+            isLoading = false
+        )
+        
+        WishInputContent(
+            viewState = previewState,
+            onEvent = { }
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Error State")
+@Composable
+fun WishInputErrorStatePreview() {
+    WishRingTheme {
+        val previewState = WishInputViewState(
+            wishes = listOf(
+                WishDayUiState(
+                    date = LocalDate.now(),
+                    wishText = "에러가 발생한 위시",
+                    isCompleted = false,
+                    targetCount = 1000,
+                    completedCount = 0
+                )
+            ),
+            isLoading = false,
+            error = "위시 저장 중 오류가 발생했습니다. 네트워크 연결을 확인하고 다시 시도해주세요."
+        )
+        
+        WishInputContent(
+            viewState = previewState,
+            onEvent = { }
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Empty with Default Values")
+@Composable
+fun WishInputEmptyDefaultPreview() {
+    WishRingTheme {
+        val previewState = WishInputViewState(
+            wishes = listOf(WishDayUiState.empty(LocalDate.now())),
+            isLoading = false
+        )
+        
+        WishInputContent(
+            viewState = previewState,
+            onEvent = { }
         )
     }
 }

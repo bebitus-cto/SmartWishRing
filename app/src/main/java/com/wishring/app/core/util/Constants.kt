@@ -91,7 +91,7 @@ object Constants {
     
     // Database
     const val DATABASE_VERSION = 3
-    const val TABLE_WISH_COUNTS = "wish_counts"
+    const val TABLE_WISHES = "wishes"
     const val TABLE_RESET_LOGS = "reset_logs"
     
     // Error Messages

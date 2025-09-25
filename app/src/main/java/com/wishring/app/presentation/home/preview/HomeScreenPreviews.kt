@@ -2,64 +2,82 @@ package com.wishring.app.presentation.home.preview
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
-import com.wishring.app.data.repository.BleConnectionState
-import com.wishring.app.data.model.DailyRecord
 import com.wishring.app.data.model.WishUiState
+import com.wishring.app.data.model.WishDayUiState
 import com.wishring.app.presentation.home.HomeScreenContent
 import com.wishring.app.presentation.home.HomeViewState
+import com.wishring.app.presentation.home.PageInfo
+import com.wishring.app.presentation.main.BlePhase
 import com.wishring.app.ui.theme.WishRingTheme
 import java.time.LocalDate
-
-@Preview(showBackground = true)
-@Composable
-private fun HomeScreenPreview() {
-    WishRingTheme {
-        HomeScreenContent(
-            uiState = HomeViewState(
-                isLoading = false,
-                todayWishUiState = WishUiState(
-                    date = "2024-01-15",
-                    targetCount = 700,
-                    wishText = "매일 운동하기",
-                    currentCount = 1000,
-                    isCompleted = false,
-                    createdAt = System.currentTimeMillis(),
-                    updatedAt = System.currentTimeMillis()
-                ),
-                recentRecords = generateDummyRecords(),
-                deviceBatteryLevel = 76,
-                bleConnectionState = BleConnectionState.CONNECTED
-            ),
-            onEvent = { /* Preview - no action */ },
-            isConnected = true,
-            scannedDevices = emptyList(),
-            showDevicePicker = false,
-            activity = null,
-            mainViewModel = null,
-            isAutoConnecting = false
-        )
-    }
-}
 
 @Preview(showBackground = true, name = "Zero Wishes State")
 @Composable
 private fun HomeScreenZeroWishesPreview() {
     WishRingTheme {
         HomeScreenContent(
-            uiState = HomeViewState(
+            uiState = HomeViewState.ConnectedNoWishes(
                 isLoading = false,
-                todayWishUiState = null,
-                recentRecords = emptyList(),
+                todayWish = null,
+                wishHistory = emptyList(),
                 deviceBatteryLevel = 15,
-                bleConnectionState = BleConnectionState.DISCONNECTED
+                pageInfo = PageInfo(currentPage = 0, hasNextPage = false, totalItems = 0)
             ),
             onEvent = { /* Preview - no action */ },
-            isConnected = false,
             scannedDevices = emptyList(),
             showDevicePicker = false,
+            blePhase = BlePhase.Idle,
             activity = null,
-            mainViewModel = null,
-            isAutoConnecting = false
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun HomeScreenPreview() {
+    WishRingTheme {
+        HomeScreenContent(
+            uiState = HomeViewState.ConnectedFullWishes(
+                isLoading = false,
+                todayWish = WishUiState(
+                    date = "2024-01-15",
+                    targetCount = 1000,
+                    wishText = "매일 운동하기",
+                    currentCount = 700,
+                    isCompleted = false,
+                    createdAt = System.currentTimeMillis(),
+                    updatedAt = System.currentTimeMillis()
+                ),
+                wishHistory = generateDummyRecords(),
+                deviceBatteryLevel = 76,
+                pageInfo = PageInfo(currentPage = 0, hasNextPage = true, totalItems = 10)
+            ),
+            onEvent = { /* Preview - no action */ },
+            scannedDevices = emptyList(),
+            showDevicePicker = false,
+            blePhase = BlePhase.Idle,
+            activity = null,
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Connected No Wishes - Registration Prompt")
+@Composable
+private fun HomeScreenConnectedNoWishesPreview() {
+    WishRingTheme {
+        HomeScreenContent(
+            uiState = HomeViewState.ConnectedNoWishes(
+                isLoading = false,
+                todayWish = null,
+                wishHistory = emptyList(),
+                deviceBatteryLevel = 85,
+                pageInfo = PageInfo(currentPage = 0, hasNextPage = false, totalItems = 0)
+            ),
+            onEvent = { /* Preview - no action */ },
+            scannedDevices = emptyList(),
+            showDevicePicker = false,
+            blePhase = BlePhase.Idle,
+            activity = null,
         )
     }
 }
@@ -69,20 +87,18 @@ private fun HomeScreenZeroWishesPreview() {
 private fun HomeScreenOneWishWithButtonPreview() {
     WishRingTheme {
         HomeScreenContent(
-            uiState = HomeViewState(
+            uiState = HomeViewState.ConnectedPartialWishes(
                 isLoading = false,
-                todayWishUiState = null,
-                recentRecords = generateDummyRecords().take(1),
+                todayWish = null,
+                wishHistory = generateDummyRecords().take(1),
                 deviceBatteryLevel = 80,
-                bleConnectionState = BleConnectionState.CONNECTED
+                pageInfo = PageInfo(currentPage = 0, hasNextPage = false, totalItems = 1)
             ),
             onEvent = { /* Preview - no action */ },
-            isConnected = true,
             scannedDevices = emptyList(),
             showDevicePicker = false,
+            blePhase = BlePhase.Idle,
             activity = null,
-            mainViewModel = null,
-            isAutoConnecting = false
         )
     }
 }
@@ -92,20 +108,18 @@ private fun HomeScreenOneWishWithButtonPreview() {
 private fun HomeScreenTwoWishesWithButtonPreview() {
     WishRingTheme {
         HomeScreenContent(
-            uiState = HomeViewState(
+            uiState = HomeViewState.ConnectedPartialWishes(
                 isLoading = false,
-                todayWishUiState = null,
-                recentRecords = generateDummyRecords().take(2),
+                todayWish = null,
+                wishHistory = generateDummyRecords().take(2),
                 deviceBatteryLevel = 60,
-                bleConnectionState = BleConnectionState.CONNECTED
+                pageInfo = PageInfo(currentPage = 0, hasNextPage = false, totalItems = 2)
             ),
             onEvent = { /* Preview - no action */ },
-            isConnected = true,
             scannedDevices = emptyList(),
             showDevicePicker = false,
+            blePhase = BlePhase.Idle,
             activity = null,
-            mainViewModel = null,
-            isAutoConnecting = false
         )
     }
 }
@@ -115,28 +129,26 @@ private fun HomeScreenTwoWishesWithButtonPreview() {
 private fun HomeScreenOneWishCompletePreview() {
     WishRingTheme {
         HomeScreenContent(
-            uiState = HomeViewState(
+            uiState = HomeViewState.ConnectedPartialWishes(
                 isLoading = false,
-                todayWishUiState = WishUiState(
+                todayWish = WishUiState(
                     date = "2024-01-15",
-                    targetCount = 1000, // 목표 달성
+                    targetCount = 1000,
                     wishText = "매일 운동하기",
                     currentCount = 1000,
                     isCompleted = true,
                     createdAt = System.currentTimeMillis(),
                     updatedAt = System.currentTimeMillis()
                 ),
-                recentRecords = generateDummyRecords().take(1),
+                wishHistory = generateDummyRecords().take(1),
                 deviceBatteryLevel = 85,
-                bleConnectionState = BleConnectionState.CONNECTED
+                pageInfo = PageInfo(currentPage = 0, hasNextPage = false, totalItems = 1)
             ),
             onEvent = { /* Preview - no action */ },
-            isConnected = true,
             scannedDevices = emptyList(),
             showDevicePicker = false,
+            blePhase = BlePhase.Idle,
             activity = null,
-            mainViewModel = null,
-            isAutoConnecting = false
         )
     }
 }
@@ -146,11 +158,11 @@ private fun HomeScreenOneWishCompletePreview() {
 private fun HomeScreenLongWishTextPreview() {
     WishRingTheme {
         HomeScreenContent(
-            uiState = HomeViewState(
+            uiState = HomeViewState.ConnectedPartialWishes(
                 isLoading = false,
-                todayWishUiState = null,
-                recentRecords = listOf(
-                    DailyRecord(
+                todayWish = null,
+                wishHistory = listOf(
+                    WishDayUiState(
                         date = LocalDate.now(),
                         completedCount = 750,
                         wishText = "나는 매일 아침 일찍 일어나서 운동을 하고, 건강한 아침 식사를 먹고, 독서를 통해 새로운 지식을 습득하며, 가족과 소중한 시간을 보내고, 일에서도 최선을 다하여 더 나은 내가 되기 위해 끊임없이 노력하고 성장하는 사람이 되고 싶다.",
@@ -159,15 +171,13 @@ private fun HomeScreenLongWishTextPreview() {
                     )
                 ),
                 deviceBatteryLevel = 70,
-                bleConnectionState = BleConnectionState.CONNECTED
+                pageInfo = PageInfo(currentPage = 0, hasNextPage = false, totalItems = 1)
             ),
             onEvent = { /* Preview - no action */ },
-            isConnected = true,
             scannedDevices = emptyList(),
             showDevicePicker = false,
+            blePhase = BlePhase.Idle,
             activity = null,
-            mainViewModel = null,
-            isAutoConnecting = false
         )
     }
 }
@@ -177,20 +187,18 @@ private fun HomeScreenLongWishTextPreview() {
 private fun HomeScreenThreeWishesPreview() {
     WishRingTheme {
         HomeScreenContent(
-            uiState = HomeViewState(
+            uiState = HomeViewState.ConnectedFullWishes(
                 isLoading = false,
-                todayWishUiState = null,
-                recentRecords = generateDummyRecords().take(3),
+                todayWish = null,
+                wishHistory = generateDummyRecords().take(3),
                 deviceBatteryLevel = 90,
-                bleConnectionState = BleConnectionState.CONNECTED
+                pageInfo = PageInfo(currentPage = 0, hasNextPage = true, totalItems = 10)
             ),
             onEvent = { /* Preview - no action */ },
-            isConnected = true,
             scannedDevices = emptyList(),
             showDevicePicker = false,
+            blePhase = BlePhase.Idle,
             activity = null,
-            mainViewModel = null,
-            isAutoConnecting = false
         )
     }
 }
@@ -200,49 +208,47 @@ private fun HomeScreenThreeWishesPreview() {
 private fun HomeScreenLoadingPreview() {
     WishRingTheme {
         HomeScreenContent(
-            uiState = HomeViewState(
-                isLoading = true,
-                todayWishUiState = WishUiState(
+            uiState = HomeViewState.BluetoothDisconnected(
+                isLoading = false,
+                todayWish = WishUiState(
                     date = "2024-01-15",
-                    targetCount = 5,
+                    targetCount = 10,
                     wishText = "매일 운동하기",
-                    currentCount = 10,
+                    currentCount = 5,
                     isCompleted = false,
                     createdAt = System.currentTimeMillis(),
                     updatedAt = System.currentTimeMillis()
                 ),
                 deviceBatteryLevel = 50,
-                bleConnectionState = BleConnectionState.CONNECTING
+                isAttemptingConnection = true
             ),
             onEvent = { /* Preview - no action */ },
-            isConnected = false,
             scannedDevices = emptyList(),
             showDevicePicker = false,
+            blePhase = BlePhase.Idle,
             activity = null,
-            mainViewModel = null,
-            isAutoConnecting = false
         )
     }
 }
 
 // Dummy data function for previews
-private fun generateDummyRecords(): List<DailyRecord> {
+private fun generateDummyRecords(): List<WishDayUiState> {
     return listOf(
-        DailyRecord(
+        WishDayUiState(
             date = LocalDate.now().minusDays(1),
             completedCount = 1000,
             wishText = "매일 아침 운동하기",
             targetCount = 1000,
             isCompleted = true
         ),
-        DailyRecord(
+        WishDayUiState(
             date = LocalDate.now().minusDays(2),
             completedCount = 750,
             wishText = "독서하며 성장하기",
             targetCount = 1000,
             isCompleted = false
         ),
-        DailyRecord(
+        WishDayUiState(
             date = LocalDate.now().minusDays(3),
             completedCount = 500,
             wishText = "가족과 시간 보내기",

@@ -1,7 +1,7 @@
 package com.wishring.app.data.repository
 
 import com.wishring.app.data.local.database.entity.WishData
-import com.wishring.app.data.model.DailyRecord
+import com.wishring.app.data.model.WishDayUiState
 import com.wishring.app.data.model.WishUiState
 import kotlinx.coroutines.flow.Flow
 
@@ -48,14 +48,14 @@ interface WishRepository {
      * @param limit Number of records to fetch
      * @return List of daily records
      */
-    suspend fun getDailyRecords(limit: Int = 30): List<DailyRecord>
+    suspend fun getWishDays(limit: Int = 30): List<WishDayUiState>
 
     /**
      * Get daily record for specific date
      * @param date Date in yyyy-MM-dd format
-     * @return DailyRecord with reset info
+     * @return WishDayUiState with reset info
      */
-    suspend fun getDailyRecord(date: String): DailyRecord?
+    suspend fun getWishDay(date: String): WishDayUiState?
 
     /**
      * Insert or update wish count
@@ -122,4 +122,12 @@ interface WishRepository {
     ): WishUiState
 
     suspend fun getRecentWishCounts(limit: Int): List<WishUiState>
+
+    /**
+     * Get wish history with pagination support
+     * @param page Page number (0-based)
+     * @param pageSize Number of items per page
+     * @return Pair of wish history and page info
+     */
+    suspend fun getWishHistoryPaginated(page: Int, pageSize: Int = 100): Pair<List<WishDayUiState>, com.wishring.app.presentation.home.PageInfo>
 }

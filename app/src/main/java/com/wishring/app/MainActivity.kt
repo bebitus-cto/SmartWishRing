@@ -1,6 +1,5 @@
 package com.wishring.app
 
-import android.Manifest
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
@@ -14,7 +13,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -25,7 +23,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
-import androidx.core.app.ActivityCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -33,7 +30,6 @@ import androidx.navigation.compose.rememberNavController
 import com.manridy.sdk_mrd2019.Manridy
 import com.manridy.sdk_mrd2019.bean.send.SystemEnum
 import com.manridy.sdk_mrd2019.install.MrdPushCore
-import com.manridy.sdk_mrd2019.send.MrdSendRequest
 import com.wishring.app.ble.model.BatteryDataModel
 import com.wishring.app.core.util.SimpleBlePermissionManager
 import com.wishring.app.data.ble.model.BleConstants
@@ -119,7 +115,7 @@ class MainActivity : ComponentActivity() {
         Log.i(WR_EVENT, "[MainActivity] ========== Classic Bluetooth Discovery 시작 ==========")
 
         // 이미 Discovery 진행 중이면 스킵
-        if (discoveryReceiver != null) {
+        if (discoveryReceiver != null || bluetoothAdapter?.isDiscovering == true) {
             Log.w(WR_EVENT, "[MainActivity] Discovery가 이미 진행 중입니다 - 스킵")
             return
         }
@@ -626,8 +622,10 @@ class MainActivity : ComponentActivity() {
      * BLE 상태 변화 관찰 및 처리
      */
     private fun observeBleStateChanges() {
+        Log.i(WR_EVENT, "[MainActivity] observeBleStateChanges() 시작됨")
         lifecycleScope.launch {
-            mainViewModel.bleUiState.collect { bleState ->
+            Log.i(WR_EVENT, "[MainActivity] Coroutine 시작 - bleUiState collect 시작")
+            mainViewModel.bleCommand.collect { bleState ->
                 Log.i(WR_EVENT, "[MainActivity] BLE 상태 변화 감지: ${bleState.phase}")
 
                 when (bleState.phase) {
@@ -647,10 +645,42 @@ class MainActivity : ComponentActivity() {
                         Log.i(WR_EVENT, "[MainActivity] 스캔 상태 감지 - Classic Discovery 시작")
                         startClassicDiscovery()
                     }
+                    
+                    BlePhase.DeviceSelected -> {
+                        Log.i(WR_EVENT, "[MainActivity] 기기 선택됨 - 연결 준비중")
+                        // 연결 준비 중 - Classic Discovery 중지
+                        stopClassicDiscovery()
+                    }
 
                     BlePhase.Idle -> {
                         Log.i(WR_EVENT, "[MainActivity] BLE 대기 상태 - Classic Discovery 중지")
                         stopClassicDiscovery()
+                    }
+                    
+                    BlePhase.Connected -> {
+                        Log.i(WR_EVENT, "[MainActivity] BLE 연결 완료 - 초기화 시작")
+                        // 초기화 작업 시작
+                    }
+                    
+                    BlePhase.Initializing -> {
+                        Log.i(WR_EVENT, "[MainActivity] BLE 초기화 중")
+                        // 초기화 진행 중
+                    }
+                    
+                    BlePhase.ReadingSettings -> {
+                        Log.i(WR_EVENT, "[MainActivity] 기기 설정 읽는 중")
+                        // 설정 읽기 중
+                    }
+                    
+                    BlePhase.WritingTime -> {
+                        Log.i(WR_EVENT, "[MainActivity] 시간 동기화 중")
+                        // 시간 동기화 중
+                    }
+                    
+                    BlePhase.Ready -> {
+                        Log.i(WR_EVENT, "[MainActivity] BLE 준비 완료 - Classic Discovery 중지")
+                        stopClassicDiscovery()
+                        // 완전히 준비됨
                     }
                 }
             }
@@ -803,6 +833,21 @@ class MainActivity : ComponentActivity() {
 
     // ByteArray를 16진수 문자열로 변환
     private fun ByteArray.toHexString() = joinToString("") { "%02X".format(it) }
+
+    /**
+     * 외부에서 배터리 레벨 요청할 수 있는 public 함수
+     * HomeScreen에서 화면 재진입 시 사용
+     */
+    fun refreshBatteryLevel() {
+        if (bluetoothGatt != null) {
+            Log.i(WR_EVENT, "[MainActivity] 배터리 레벨 새로고침 요청")
+            lifecycleScope.launch {
+                requestBatteryLevel()
+            }
+        } else {
+            Log.w(WR_EVENT, "[MainActivity] BLE 연결되지 않음 - 배터리 요청 불가")
+        }
+    }
 
     // 연결 해제
     fun disconnectDevice() {

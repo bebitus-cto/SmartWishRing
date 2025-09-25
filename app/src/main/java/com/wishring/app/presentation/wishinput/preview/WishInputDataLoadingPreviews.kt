@@ -9,24 +9,25 @@ import java.time.LocalDate
 import com.wishring.app.ui.theme.WishRingTheme
 
 /**
- * Edge case preview states for WishInputScreen
+ * Data loading preview states for WishInputScreen
  */
 
-@Preview(showBackground = true, name = "Very Long Text")
+@Preview(showBackground = true, name = "Loading Existing Data")
 @Composable
-fun WishInputScreenLongTextPreview() {
+fun WishInputLoadingExistingPreview() {
     WishRingTheme {
         val previewState = WishInputViewState(
             wishes = listOf(
                 WishDayUiState(
                     date = LocalDate.now(),
-                    wishText = "나는 매일 아침 일찍 일어나서 운동을 하고 건강한 아침을 먹고 명상을 하며 하루를 시작하는 건강한 사람이다",
+                    wishText = "불러오는 중...",
                     isCompleted = false,
                     targetCount = 1000,
                     completedCount = 0
                 )
             ),
-            isLoading = false
+            isLoading = true,
+            existingRecord = true
         )
         
         WishInputContent(
@@ -36,35 +37,36 @@ fun WishInputScreenLongTextPreview() {
     }
 }
 
-@Preview(showBackground = true, name = "Multiple Long Texts")
+@Preview(showBackground = true, name = "Loading Multiple Existing")
 @Composable
-fun WishInputScreenMultipleLongTextsPreview() {
+fun WishInputLoadingMultiplePreview() {
     WishRingTheme {
         val previewState = WishInputViewState(
             wishes = listOf(
                 WishDayUiState(
                     date = LocalDate.now(),
-                    wishText = "첫 번째 아주 긴 위시 텍스트로 100자 제한을 테스트하기 위한 매우 긴 문장입니다",
+                    wishText = "첫 번째 위시",
                     isCompleted = false,
                     targetCount = 1000,
-                    completedCount = 0
+                    completedCount = 100
                 ),
                 WishDayUiState(
                     date = LocalDate.now(),
                     wishText = "두 번째 위시",
                     isCompleted = false,
                     targetCount = 2000,
-                    completedCount = 0
+                    completedCount = 200
                 ),
                 WishDayUiState(
                     date = LocalDate.now(),
-                    wishText = "세 번째 긴 위시 텍스트입니다. 여러 줄에 걸쳐서 표시되는 긴 텍스트",
+                    wishText = "세 번째 위시",
                     isCompleted = false,
                     targetCount = 3000,
-                    completedCount = 0
+                    completedCount = 300
                 )
             ),
-            isLoading = false
+            isLoading = true,
+            existingRecord = true
         )
         
         WishInputContent(
@@ -74,29 +76,125 @@ fun WishInputScreenMultipleLongTextsPreview() {
     }
 }
 
-@Preview(showBackground = true, name = "Mixed Valid/Invalid")
+@Preview(showBackground = true, name = "Loading Partial Data")
 @Composable
-fun WishInputScreenMixedValidPreview() {
+fun WishInputLoadingPartialPreview() {
     WishRingTheme {
         val previewState = WishInputViewState(
             wishes = listOf(
                 WishDayUiState(
                     date = LocalDate.now(),
-                    wishText = "유효한 위시",
+                    wishText = "첫 번째 위시 로드됨",
                     isCompleted = false,
                     targetCount = 1000,
-                    completedCount = 0
+                    completedCount = 500
                 ),
-                WishDayUiState.empty(LocalDate.now()), // 빈 위시 (무효)
+                WishDayUiState.empty(LocalDate.now()), // 두 번째는 비어있음
+                WishDayUiState.empty(LocalDate.now())  // 세 번째도 비어있음
+            ),
+            isLoading = true,
+            existingRecord = true
+        )
+        
+        WishInputContent(
+            viewState = previewState,
+            onEvent = { }
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Initial Loading")
+@Composable
+fun WishInputInitialLoadingPreview() {
+    WishRingTheme {
+        val previewState = WishInputViewState(
+            wishes = listOf(WishDayUiState.empty(LocalDate.now())),
+            isLoading = true,
+            existingRecord = false
+        )
+        
+        WishInputContent(
+            viewState = previewState,
+            onEvent = { }
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Loading Error")
+@Composable
+fun WishInputLoadingErrorPreview() {
+    WishRingTheme {
+        val previewState = WishInputViewState(
+            wishes = listOf(WishDayUiState.empty(LocalDate.now())),
+            isLoading = false,
+            error = "기존 위시를 불러오는데 실패했습니다"
+        )
+        
+        WishInputContent(
+            viewState = previewState,
+            onEvent = { }
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Loaded with Progress")
+@Composable
+fun WishInputLoadedWithProgressPreview() {
+    WishRingTheme {
+        val previewState = WishInputViewState(
+            wishes = listOf(
                 WishDayUiState(
                     date = LocalDate.now(),
-                    wishText = "또 다른 유효한 위시",
+                    wishText = "진행 중인 위시 (50%)",
                     isCompleted = false,
+                    targetCount = 1000,
+                    completedCount = 500
+                ),
+                WishDayUiState(
+                    date = LocalDate.now(),
+                    wishText = "시작한 위시 (10%)",
+                    isCompleted = false,
+                    targetCount = 1000,
+                    completedCount = 100
+                ),
+                WishDayUiState.empty(LocalDate.now())
+            ),
+            isLoading = false,
+            isEditMode = true,
+            existingRecord = true
+        )
+        
+        WishInputContent(
+            viewState = previewState,
+            onEvent = { }
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Loaded Completed Wishes")
+@Composable
+fun WishInputLoadedCompletedPreview() {
+    WishRingTheme {
+        val previewState = WishInputViewState(
+            wishes = listOf(
+                WishDayUiState(
+                    date = LocalDate.now(),
+                    wishText = "완료된 위시 1",
+                    isCompleted = true,
+                    targetCount = 1000,
+                    completedCount = 1000
+                ),
+                WishDayUiState(
+                    date = LocalDate.now(),
+                    wishText = "완료된 위시 2",
+                    isCompleted = true,
                     targetCount = 500,
-                    completedCount = 0
+                    completedCount = 500
                 )
             ),
-            isLoading = false
+            isLoading = false,
+            isEditMode = true,
+            existingRecord = true
         )
         
         WishInputContent(
@@ -106,104 +204,29 @@ fun WishInputScreenMixedValidPreview() {
     }
 }
 
-@Preview(showBackground = true, name = "High Target Counts")
+@Preview(showBackground = true, name = "Saving State")
 @Composable
-fun WishInputScreenHighTargetPreview() {
+fun WishInputSavingPreview() {
     WishRingTheme {
         val previewState = WishInputViewState(
             wishes = listOf(
                 WishDayUiState(
                     date = LocalDate.now(),
-                    wishText = "10000회 목표",
-                    isCompleted = false,
-                    targetCount = 10000,
-                    completedCount = 0
-                ),
-                WishDayUiState(
-                    date = LocalDate.now(),
-                    wishText = "5000회 목표",
-                    isCompleted = false,
-                    targetCount = 5000,
-                    completedCount = 0
-                )
-            ),
-            isLoading = false
-        )
-        
-        WishInputContent(
-            viewState = previewState,
-            onEvent = { }
-        )
-    }
-}
-
-@Preview(showBackground = true, name = "Low Target Counts")
-@Composable
-fun WishInputScreenLowTargetPreview() {
-    WishRingTheme {
-        val previewState = WishInputViewState(
-            wishes = listOf(
-                WishDayUiState(
-                    date = LocalDate.now(),
-                    wishText = "1회 목표",
-                    isCompleted = false,
-                    targetCount = 1,
-                    completedCount = 0
-                ),
-                WishDayUiState(
-                    date = LocalDate.now(),
-                    wishText = "10회 목표",
-                    isCompleted = false,
-                    targetCount = 10,
-                    completedCount = 0
-                ),
-                WishDayUiState(
-                    date = LocalDate.now(),
-                    wishText = "100회 목표",
-                    isCompleted = false,
-                    targetCount = 100,
-                    completedCount = 0
-                )
-            ),
-            isLoading = false
-        )
-        
-        WishInputContent(
-            viewState = previewState,
-            onEvent = { }
-        )
-    }
-}
-
-@Preview(showBackground = true, name = "Special Characters")
-@Composable
-fun WishInputScreenSpecialCharsPreview() {
-    WishRingTheme {
-        val previewState = WishInputViewState(
-            wishes = listOf(
-                WishDayUiState(
-                    date = LocalDate.now(),
-                    wishText = "특수문자 !@#$%^&*()",
+                    wishText = "저장 중인 위시",
                     isCompleted = false,
                     targetCount = 1000,
                     completedCount = 0
                 ),
                 WishDayUiState(
                     date = LocalDate.now(),
-                    wishText = "이모지 😀🎉✨",
+                    wishText = "함께 저장되는 위시",
                     isCompleted = false,
-                    targetCount = 500,
-                    completedCount = 0
-                ),
-                WishDayUiState(
-                    date = LocalDate.now(),
-                    wishText = "한글+English+123",
-                    isCompleted = false,
-                    targetCount = 1000,
+                    targetCount = 2000,
                     completedCount = 0
                 )
             ),
-            isLoading = false
+            isLoading = false,
+            isSaving = true
         )
         
         WishInputContent(

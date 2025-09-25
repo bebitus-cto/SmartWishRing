@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.wishring.app.R
 import com.wishring.app.presentation.home.HomeViewState
+import com.wishring.app.presentation.home.showLowBatteryWarning
 import com.wishring.app.ui.theme.Purple_Medium
 import com.wishring.app.ui.theme.Text_Secondary
 
@@ -43,7 +44,7 @@ fun FloatingBottomBar(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 30.dp)
+                .padding(horizontal = 20.dp, vertical = 15.dp)
         ) {
             // Battery status
             // Battery level display - always show icon, percentage only when connected
@@ -56,30 +57,30 @@ fun FloatingBottomBar(
                 Icon(
                     painter = painterResource(id = R.drawable.ic_battery),
                     contentDescription = stringResource(id = R.string.battery_description),
-                    tint = if (uiState.deviceBatteryLevel != null && uiState.deviceBatteryLevel < 20) Color.Red else Text_Secondary,
+                    tint = if (uiState.showLowBatteryWarning) Color.Red else Text_Secondary,
                     modifier = Modifier.size(width = 37.dp, height = 21.dp)
                 )
                 Spacer(modifier = Modifier.width(4.dp))
 
                 // 배터리 퍼센트는 연결되고 값이 있을 때만 표시
-                if (isConnected && uiState.deviceBatteryLevel != null) {
+                val batteryLevel = uiState.deviceBatteryLevel
+                if (isConnected && batteryLevel != null) {
                     Text(
-                        text = "${uiState.deviceBatteryLevel}%",
+                        text = "${batteryLevel}%",
                         style = MaterialTheme.typography.bodySmall.copy(
                             fontSize = 8.sp,
                             fontWeight = FontWeight.Medium
                         ),
-                        color = if (uiState.deviceBatteryLevel < 20) Color.Red else Text_Secondary
+                        color = if (batteryLevel < 20) Color.Red else Color(0xFF424243)
                     )
                 } else if (isConnected) {
-                    // 배터리 레벨 로딩 중
                     Text(
                         text = "연결중...",
                         style = MaterialTheme.typography.bodySmall.copy(
                             fontSize = 8.sp,
                             fontWeight = FontWeight.Medium
                         ),
-                        color = Text_Secondary
+                        color = Color(0xFF424243)
                     )
                 }
             }

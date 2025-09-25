@@ -3,17 +3,14 @@ package com.wishring.app.presentation.wishinput
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.wishring.app.data.model.WishDayUiState
 import com.wishring.app.data.repository.WishRepository
 import com.wishring.app.data.repository.PreferencesRepository
-import com.wishring.app.presentation.wishinput.model.WishItem
-import com.wishring.app.presentation.wishinput.model.toWishDataList
-import com.wishring.app.presentation.wishinput.model.toWishItemList
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.time.LocalDate
-import java.util.UUID
 import javax.inject.Inject
 
 /**
@@ -44,9 +41,9 @@ class WishInputViewModel @Inject constructor(
     fun onEvent(event: WishInputEvent) {
         when (event) {
             is WishInputEvent.AddWish -> addWish(event.position)
-            is WishInputEvent.RemoveWish -> removeWish(event.wishId)
-            is WishInputEvent.UpdateWishText -> updateWishText(event.wishId, event.text)
-            is WishInputEvent.UpdateWishCount -> updateWishCount(event.wishId, event.count)
+            is WishInputEvent.RemoveWish -> removeWish(event.index)
+            is WishInputEvent.UpdateWishText -> updateWishText(event.index, event.text)
+            is WishInputEvent.UpdateWishCount -> updateWishCount(event.index, event.count)
             WishInputEvent.SaveWish -> saveWish()
             WishInputEvent.DeleteWish -> deleteWish()
             WishInputEvent.ShowDeleteConfirmation -> showDeleteConfirmation()
@@ -68,7 +65,13 @@ class WishInputViewModel @Inject constructor(
                 val defaultTarget = preferencesRepository.getDefaultTargetCount()
                 
                 // Create initial wish item with defaults
-                val initialWish = WishItem.create(defaultWish, defaultTarget)
+                val initialWish = WishDayUiState(
+                    date = LocalDate.now(),
+                    wishText = defaultWish,
+                    isCompleted = false,
+                    targetCount = defaultTarget,
+                    completedCount = 0
+                )
                 _uiState.update { state ->
                     state.copy(
                         wishes = listOf(initialWish)
@@ -82,37 +85,41 @@ class WishInputViewModel @Inject constructor(
     
     private fun checkForExistingRecord() {
         viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            
             try {
                 val today = LocalDate.now()
-                val todayWishes = wishRepository.getTodayWishes()
-                val todayWishCount = wishRepository.getTodayWish()
+                val todayWish = wishRepository.getTodayWish()
                 
-                if (todayWishes.isNotEmpty() && todayWishCount != null) {
-                    // Convert existing wishes to WishItem list with shared target count
-                    val existingWishes = todayWishes.toWishItemList(todayWishCount.currentCount)
+                if (todayWish != null && todayWish.wishText.isNotBlank()) {
+                    // Load existing wish
+                    val existingWish = WishDayUiState(
+                        date = today,
+                        wishText = todayWish.wishText,
+                        isCompleted = todayWish.isCompleted,
+                        targetCount = todayWish.targetCount,
+                        completedCount = todayWish.currentCount
+                    )
                     _uiState.update { state ->
                         state.copy(
-                            wishes = existingWishes,
+                            wishes = listOf(existingWish),
                             isEditMode = true,
-                            existingRecord = true
+                            existingRecord = true,
+                            isLoading = false
                         )
                     }
                 } else {
-                    // Fallback to old single wish approach for backward compatibility
-                    val record = wishRepository.getDailyRecord(today.toString())
-                    if (record != null && record.wishText.isNotBlank()) {
-                        val existingWish = WishItem.create(record.wishText, record.targetCount)
-                        _uiState.update { state ->
-                            state.copy(
-                                wishes = listOf(existingWish),
-                                isEditMode = true,
-                                existingRecord = true
-                            )
-                        }
-                    }
+                    // No existing wish
+                    _uiState.update { it.copy(isLoading = false) }
                 }
+                
             } catch (e: Exception) {
-                // Handle error silently, keep default state
+                _uiState.update { state ->
+                    state.copy(
+                        isLoading = false,
+                        error = "기존 위시를 불러오는데 실패했습니다"
+                    )
+                }
             }
         }
     }
@@ -120,7 +127,7 @@ class WishInputViewModel @Inject constructor(
     private fun addWish(position: Int? = null) {
         val currentState = _uiState.value
         if (currentState.canAddMoreWishes) {
-            val newWish = WishItem.createEmpty()
+            val newWish = WishDayUiState.empty(LocalDate.now())
             val updatedWishes = if (position != null && position <= currentState.wishes.size) {
                 currentState.wishes.toMutableList().apply {
                     add(position, newWish)
@@ -135,21 +142,23 @@ class WishInputViewModel @Inject constructor(
         }
     }
     
-    private fun removeWish(wishId: UUID) {
+    private fun removeWish(index: Int) {
         val currentState = _uiState.value
-        if (currentState.canRemoveWishes) {
-            val updatedWishes = currentState.wishes.filterNot { it.id == wishId }
+        if (currentState.canRemoveWishes && index in currentState.wishes.indices) {
+            val updatedWishes = currentState.wishes.toMutableList().apply {
+                removeAt(index)
+            }
             _uiState.update { state ->
                 state.copy(wishes = updatedWishes)
             }
         }
     }
     
-    private fun updateWishText(wishId: UUID, text: String) {
+    private fun updateWishText(index: Int, text: String) {
         if (text.length <= _uiState.value.maxWishLength) {
             _uiState.update { state ->
-                val updatedWishes = state.wishes.map { wish ->
-                    if (wish.id == wishId) wish.copy(text = text) else wish
+                val updatedWishes = state.wishes.mapIndexed { i, wish ->
+                    if (i == index) wish.copy(wishText = text) else wish
                 }
                 state.copy(wishes = updatedWishes)
             }
@@ -163,11 +172,11 @@ class WishInputViewModel @Inject constructor(
         }
     }
     
-    private fun updateWishCount(wishId: UUID, count: Int) {
+    private fun updateWishCount(index: Int, count: Int) {
         if (count in _uiState.value.minTargetCount.._uiState.value.maxTargetCount) {
             _uiState.update { state ->
-                val updatedWishes = state.wishes.map { wish ->
-                    if (wish.id == wishId) wish.copy(targetCount = count) else wish
+                val updatedWishes = state.wishes.mapIndexed { i, wish ->
+                    if (i == index) wish.copy(targetCount = count) else wish
                 }
                 state.copy(wishes = updatedWishes)
             }
@@ -190,36 +199,40 @@ class WishInputViewModel @Inject constructor(
             _uiState.update { state -> state.copy(isSaving = true) }
             
             try {
-                // Save all valid wishes as JSON in the database
-                val validWishes = currentState.wishes.filter { it.isValid }
+                // Save the first valid wish (single wish mode for now)
+                val validWish = currentState.wishes.firstOrNull { 
+                    it.wishText.isNotBlank() && it.targetCount > 0 
+                }
                 
-                if (validWishes.isNotEmpty()) {
-                    // Convert WishItems to WishData format for storage
-                    val wishDataList = validWishes.toWishDataList()
+                if (validWish != null) {
+                    // Save to repository
+                    val today = LocalDate.now().toString()
+                    val existing = wishRepository.getWishCountByDate(today)
                     
-                    // Update repository with multiple wishes
-                    // All wishes share the same target count from the first valid wish
-                    val targetCount = validWishes.first().targetCount
-                    wishRepository.updateTodayWishesAndTarget(
-                        wishesData = wishDataList,
-                        targetCount = targetCount,
-                        activeWishIndex = 0 // Default to first wish as active
-                    )
-                    
-                    // Handle date change edge case
-                    val currentDate = LocalDate.now()
-                    val wishCreationDate = validWishes.first().creationDate
-                    
-                    if (currentDate != wishCreationDate) {
-                        _effect.send(WishInputEffect.ShowToast(
-                            "날짜가 변경되었습니다. ${wishCreationDate} 위시로 저장됩니다."
+                    if (existing != null) {
+                        // Update existing
+                        wishRepository.saveWishCount(existing.copy(
+                            wishText = validWish.wishText,
+                            targetCount = validWish.targetCount
                         ))
+                    } else {
+                        // Create new
+                        val newWish = com.wishring.app.data.model.WishUiState(
+                            date = today,
+                            wishText = validWish.wishText,
+                            targetCount = validWish.targetCount,
+                            currentCount = 0,
+                            isCompleted = false,
+                            createdAt = System.currentTimeMillis(),
+                            updatedAt = System.currentTimeMillis()
+                        )
+                        wishRepository.saveWishCount(newWish)
                     }
                     
-                    val message = when {
-                        currentState.isEditMode -> "위시가 수정되었습니다"
-                        validWishes.size > 1 -> "${validWishes.size}개의 위시가 등록되었습니다"
-                        else -> "위시가 등록되었습니다"
+                    val message = if (currentState.isEditMode) {
+                        "위시가 수정되었습니다"
+                    } else {
+                        "위시가 등록되었습니다"
                     }
                     
                     _effect.send(WishInputEffect.ShowToast(message))
@@ -289,7 +302,7 @@ class WishInputViewModel @Inject constructor(
     private fun resetToDefaults() {
         _uiState.update { state ->
             state.copy(
-                wishes = listOf(WishItem.createEmpty()),
+                wishes = listOf(WishDayUiState.empty(LocalDate.now())),
                 isEditMode = false,
                 existingRecord = false
             )
@@ -300,13 +313,16 @@ class WishInputViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val recordDate = LocalDate.parse(date)
+                val record = wishRepository.getWishDay(recordDate.toString())
                 
-                // Try to get wishes for the specific date
-                // Note: This would need a new repository method getTodayWishes(date: String)
-                // For now, we'll use the existing getDailyRecord as fallback
-                val record = wishRepository.getDailyRecord(recordDate.toString())
                 if (record != null && record.wishText.isNotBlank()) {
-                    val existingWish = WishItem.create(record.wishText, record.targetCount)
+                    val existingWish = WishDayUiState(
+                        date = recordDate,
+                        wishText = record.wishText,
+                        isCompleted = record.isCompleted,
+                        targetCount = record.targetCount,
+                        completedCount = record.completedCount
+                    )
                     _uiState.update { state ->
                         state.copy(
                             wishes = listOf(existingWish),
@@ -347,7 +363,7 @@ class WishInputViewModel @Inject constructor(
     private fun clearWishText() {
         _uiState.update { state ->
             val updatedWishes = state.wishes.map { wish ->
-                wish.copy(text = "")
+                wish.copy(wishText = "")
             }
             state.copy(wishes = updatedWishes)
         }

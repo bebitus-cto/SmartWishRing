@@ -4,22 +4,26 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.tooling.preview.Preview
 import com.wishring.app.presentation.wishinput.WishInputContent
 import com.wishring.app.presentation.wishinput.WishInputViewState
-import com.wishring.app.presentation.wishinput.model.WishItem
+import com.wishring.app.data.model.WishDayUiState
+import java.time.LocalDate
 import com.wishring.app.ui.theme.WishRingTheme
 
 /**
- * Basic preview states for WishInput screen
+ * Basic preview states for WishInputScreen
  */
 
-@Preview(showBackground = true, device = "id:pixel_5", name = "Single Wish")
+@Preview(showBackground = true, name = "Single Wish")
 @Composable
 fun WishInputScreenSinglePreview() {
     WishRingTheme {
         val previewState = WishInputViewState(
             wishes = listOf(
-                WishItem.create(
-                    text = "나는 매일 성장하고 있다",
-                    targetCount = 1000
+                WishDayUiState(
+                    date = LocalDate.now(),
+                    wishText = "나는 매일 성장하고 있다",
+                    isCompleted = false,
+                    targetCount = 1000,
+                    completedCount = 0
                 )
             ),
             isLoading = false
@@ -27,54 +31,69 @@ fun WishInputScreenSinglePreview() {
         
         WishInputContent(
             viewState = previewState,
-            onEvent = {}
+            onEvent = { }
         )
     }
 }
 
-@Preview(showBackground = true, device = "id:pixel_5", name = "Multiple Wishes")
+@Preview(showBackground = true, name = "Multiple Wishes")
 @Composable
 fun WishInputScreenMultiplePreview() {
     WishRingTheme {
         val previewState = WishInputViewState(
             wishes = listOf(
-                WishItem.create(
-                    text = "나는 매일 성장하고 있다",
-                    targetCount = 1000
+                WishDayUiState(
+                    date = LocalDate.now(),
+                    wishText = "건강한 몸 만들기",
+                    isCompleted = false,
+                    targetCount = 1000,
+                    completedCount = 0
                 ),
-                WishItem.create(
-                    text = "건강한 습관을 만들어간다",
-                    targetCount = 2000
+                WishDayUiState(
+                    date = LocalDate.now(),
+                    wishText = "매일 감사하기",
+                    isCompleted = false,
+                    targetCount = 500,
+                    completedCount = 0
                 ),
-                WishItem.createEmpty()
+                WishDayUiState.empty(LocalDate.now())
             ),
             isLoading = false
         )
         
         WishInputContent(
             viewState = previewState,
-            onEvent = {}
+            onEvent = { }
         )
     }
 }
 
-@Preview(showBackground = true, device = "id:pixel_5", name = "Max Wishes Reached")
+@Preview(showBackground = true, name = "Max Wishes (3)")
 @Composable
-fun WishInputScreenMaxPreview() {
+fun WishInputScreenMaxWishesPreview() {
     WishRingTheme {
         val previewState = WishInputViewState(
             wishes = listOf(
-                WishItem.create(
-                    text = "나는 매일 성장하고 있다",
-                    targetCount = 1000
+                WishDayUiState(
+                    date = LocalDate.now(),
+                    wishText = "부자 되기",
+                    isCompleted = false,
+                    targetCount = 10000,
+                    completedCount = 0
                 ),
-                WishItem.create(
-                    text = "건강한 습관을 만들어간다",
-                    targetCount = 2000
+                WishDayUiState(
+                    date = LocalDate.now(),
+                    wishText = "행복한 가정 만들기",
+                    isCompleted = false,
+                    targetCount = 5000,
+                    completedCount = 0
                 ),
-                WishItem.create(
-                    text = "감사하는 마음을 가진다",
-                    targetCount = 1500
+                WishDayUiState(
+                    date = LocalDate.now(),
+                    wishText = "세계 여행하기",
+                    isCompleted = false,
+                    targetCount = 1000,
+                    completedCount = 0
                 )
             ),
             isLoading = false
@@ -82,47 +101,50 @@ fun WishInputScreenMaxPreview() {
         
         WishInputContent(
             viewState = previewState,
-            onEvent = {}
+            onEvent = { }
         )
     }
 }
 
-@Preview(showBackground = true, device = "id:pixel_5", name = "Empty Initial")
+@Preview(showBackground = true, name = "Empty State")
 @Composable
 fun WishInputScreenEmptyPreview() {
     WishRingTheme {
         val previewState = WishInputViewState(
-            wishes = listOf(
-                WishItem.createEmpty()
-            ),
+            wishes = listOf(WishDayUiState.empty(LocalDate.now())),
             isLoading = false
         )
         
         WishInputContent(
             viewState = previewState,
-            onEvent = {}
+            onEvent = { }
         )
     }
 }
 
-@Preview(showBackground = true, device = "id:pixel_5", name = "Two Wishes Partial")
+@Preview(showBackground = true, name = "Edit Mode with Existing")
 @Composable
-fun WishInputScreenTwoWishesPartialPreview() {
+fun WishInputScreenEditPreview() {
     WishRingTheme {
         val previewState = WishInputViewState(
             wishes = listOf(
-                WishItem.create(
-                    text = "첫 번째 소원",
-                    targetCount = 1000
+                WishDayUiState(
+                    date = LocalDate.now(),
+                    wishText = "기존 위시 수정하기",
+                    isCompleted = false,
+                    targetCount = 2000,
+                    completedCount = 500
                 ),
-                WishItem.createEmpty()
+                WishDayUiState.empty(LocalDate.now())
             ),
-            isLoading = false
+            isLoading = false,
+            isEditMode = true,
+            existingRecord = true
         )
         
         WishInputContent(
             viewState = previewState,
-            onEvent = {}
+            onEvent = { }
         )
     }
 }

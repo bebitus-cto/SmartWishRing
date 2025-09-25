@@ -8,7 +8,8 @@ import com.wishring.app.presentation.wishinput.WishInputViewModel
 import com.wishring.app.presentation.wishinput.WishInputEvent
 import com.wishring.app.presentation.wishinput.WishInputEffect
 import com.wishring.app.presentation.wishinput.ValidationField
-import com.wishring.app.presentation.wishinput.model.WishItem
+import com.wishring.app.data.model.WishDayUiState
+import java.time.LocalDate
 import io.mockk.*
 import io.mockk.impl.annotations.MockK
 import kotlinx.coroutines.Dispatchers
@@ -413,7 +414,13 @@ class WishInputViewModelTest {
             val yesterday = LocalDate.now().minusDays(1)
             
             // Create wish with yesterday's date (simulate midnight crossing)
-            val yesterdayWish = WishItem.create("어제의 위시", 1000)
+            val yesterdayWish = WishDayUiState(
+                date = LocalDate.now().minusDays(1),
+                wishText = "어제의 위시",
+                isCompleted = false,
+                targetCount = 1000,
+                completedCount = 0
+            )
                 .copy(creationDate = yesterday)
             
             viewModel.uiState.value = viewModel.uiState.value.copy(

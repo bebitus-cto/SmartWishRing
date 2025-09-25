@@ -4,13 +4,13 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 /**
- * Domain model for daily record display
- * Represents aggregated daily data for UI presentation
+ * UI model for daily wish records
+ * Represents aggregated wish data for a specific day
  *
- * 일별 기록을 표시하기 위한 도메인 모델
- * UI 표시용 집계된 일별 데이터를 나타냄
+ * 일별 위시 기록을 표시하기 위한 UI 모델
+ * 특정 날짜의 집계된 위시 데이터를 나타냄
  */
-data class DailyRecord(
+data class WishDayUiState(
     val date: LocalDate,
     val wishText: String,
     val isCompleted: Boolean,
@@ -27,11 +27,11 @@ data class DailyRecord(
 
     companion object {
         /**
-         * Create from WishCount model
+         * Create from WishUiState model
          */
-        fun fromWishCount(wishUiState: WishUiState): DailyRecord {
+        fun fromWishCount(wishUiState: WishUiState): WishDayUiState {
             val localDate = LocalDate.parse(wishUiState.date)
-            return DailyRecord(
+            return WishDayUiState(
                 date = localDate,
                 wishText = wishUiState.wishText,
                 isCompleted = wishUiState.isCompleted,
@@ -43,8 +43,8 @@ data class DailyRecord(
         /**
          * Create empty record for date
          */
-        fun empty(date: LocalDate): DailyRecord {
-            return DailyRecord(
+        fun empty(date: LocalDate): WishDayUiState {
+            return WishDayUiState(
                 date = date,
                 wishText = "",
                 isCompleted = false,

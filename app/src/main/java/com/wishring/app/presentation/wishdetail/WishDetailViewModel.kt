@@ -69,13 +69,13 @@ class WishDetailViewModel @Inject constructor(
 
             try {
                 val dateString = date.format(DateTimeFormatter.ISO_LOCAL_DATE)
-                val dailyRecord = wishRepository.getDailyRecord(dateString)
+                val wishDay = wishRepository.getWishDay(dateString)
 
                 _uiState.update { state ->
                     state.copy(
                         isLoading = false,
-                        targetCount = dailyRecord?.targetCount ?: 0,
-                        wishText = dailyRecord?.wishText ?: "",
+                        targetCount = wishDay?.targetCount ?: 0,
+                        wishText = wishDay?.wishText ?: "",
                         motivationalMessages = getMotivationalMessages()
                     )
                 }

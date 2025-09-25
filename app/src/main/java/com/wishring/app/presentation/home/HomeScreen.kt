@@ -4,34 +4,19 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -39,31 +24,27 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.wishring.app.MainActivity
-import com.wishring.app.R
 import com.wishring.app.core.util.ShareUtils
-import com.wishring.app.data.model.DailyRecord
-import com.wishring.app.presentation.home.component.CircularProgress
-import com.wishring.app.presentation.component.WishCard
-import com.wishring.app.presentation.components.ConnectionSuccessAnimation
-import com.wishring.app.presentation.components.ShareDialog
+import com.wishring.app.data.model.WishDayUiState
 import com.wishring.app.presentation.home.component.BleDevicePickerDialog
 import com.wishring.app.presentation.home.component.BluetoothConnectionStatus
 import com.wishring.app.presentation.home.component.FloatingBottomBar
-import com.wishring.app.presentation.home.component.ReportCard
-import com.wishring.app.presentation.main.AutoConnectResult
+import com.wishring.app.presentation.home.component.WishHistorySection
+import com.wishring.app.presentation.home.component.TodayCountCard
+import com.wishring.app.presentation.home.component.WishButton
+import com.wishring.app.presentation.home.component.LatestWishCard
+import com.wishring.app.presentation.home.component.WishRegistrationPrompt
+
+import com.wishring.app.presentation.main.BlePhase
 import com.wishring.app.presentation.main.DeviceInfo
 import com.wishring.app.presentation.main.MainViewModel
 import com.wishring.app.presentation.main.MainViewModel.Companion.WR_EVENT
-import com.wishring.app.ui.theme.Purple_Medium
 import com.wishring.app.ui.theme.Purple_Primary
+import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,15 +55,60 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
     mainViewModel: MainViewModel = hiltViewModel<MainViewModel>()
 ) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val bleCommand by mainViewModel.bleCommand.collectAsStateWithLifecycle()
+    
+    // MainViewModel에서 위시 데이터 가져오기
+    val wishHistory = bleCommand.wishHistory
+    val todayWish = bleCommand.todayWish
+    val pageInfo = bleCommand.pageInfo
+    val isWishDataLoading = bleCommand.isWishDataLoading
+    val wishDataError = bleCommand.wishDataError
+    val deviceBatteryLevel = bleCommand.batteryLevel
+    
+    val isConnected = bleCommand.isConnected
+    val scannedDevices = bleCommand.scannedDevices
+    val showDevicePicker = bleCommand.shouldShowDevicePicker
+    val blePhase = bleCommand.phase
+    
+    // HomeViewState를 MainViewModel 데이터로 구성
+    val uiState = when {
+        !isConnected -> HomeViewState.BluetoothDisconnected(
+            wishHistory = wishHistory,
+            todayWish = todayWish,
+            isLoading = isWishDataLoading,
+            error = wishDataError,
+            pageInfo = null, // 연결 해제 시에는 null
+            deviceBatteryLevel = deviceBatteryLevel
+        )
+        todayWish == null || (todayWish.targetCount == 0) -> HomeViewState.ConnectedNoWishes(
+            wishHistory = wishHistory,
+            todayWish = todayWish,
+            isLoading = isWishDataLoading,
+            error = wishDataError,
+            pageInfo = pageInfo,
+            deviceBatteryLevel = deviceBatteryLevel
+        )
+        todayWish.currentCount < todayWish.targetCount && todayWish.currentCount < (todayWish.targetCount * 0.8f) -> HomeViewState.ConnectedPartialWishes(
+            wishHistory = wishHistory,
+            todayWish = todayWish,
+            isLoading = isWishDataLoading,
+            error = wishDataError,
+            pageInfo = pageInfo,
+            deviceBatteryLevel = deviceBatteryLevel
+        )
+        else -> HomeViewState.ConnectedFullWishes(
+            wishHistory = wishHistory,
+            todayWish = todayWish,
+            isLoading = isWishDataLoading,
+            error = wishDataError,
+            pageInfo = pageInfo,
+            deviceBatteryLevel = deviceBatteryLevel
+        )
+    }
     val effect by viewModel.effect.collectAsStateWithLifecycle(null)
     val context = LocalContext.current
 
-    val mainBleState by mainViewModel.bleUiState.collectAsStateWithLifecycle()
 
-    val isConnected = mainBleState.isConnected
-    val scannedDevices = mainBleState.scannedDevices
-    val showDevicePicker = mainBleState.shouldShowDevicePicker
 
     val activity = context as? MainActivity
 
@@ -188,45 +214,41 @@ fun HomeScreen(
 
     // Load initial data
     LaunchedEffect(Unit) {
-        viewModel.onEvent(HomeEvent.LoadData)
+        mainViewModel.loadInitialWishData()
+        
+        // 연결된 상태에서 HomeScreen 진입 시 배터리 정보 적극적으로 요청
+        if (isConnected) {
+            Log.d("HomeScreen", "[배터리] HomeScreen 진입 - 연결된 상태에서 배터리 정보 요청")
+            activity?.refreshBatteryLevel()
+        }
+
+    // Battery level is already handled by MainViewModel
+    // BLE connection state is already handled by MainViewModel
     }
 
-    // MainViewModel 자동 연결 상태 감지 (MainActivity에서 권한 체크 후 시작됨)
-    val isAutoConnecting = mainBleState.isAutoConnecting
-    val autoConnectResult = mainBleState.autoConnectResult
-
-    // 자동 연결 결과 처리 - 성공 시에만 토스트 표시
-    LaunchedEffect(autoConnectResult) {
-        autoConnectResult?.let { result ->
-            when (result) {
-                is AutoConnectResult.Success -> {
-                    // 자동 연결 성공 - 토스트 표시
-                    // TODO: HomeEffect 대신 SnackbarHost 또는 직접 토스트 처리 필요
-                    Log.d("HomeScreen", "Auto-connect success: ${result.deviceName}")
-                }
-
-                is AutoConnectResult.Failed -> {
-                    // 자동 연결 실패 - 조용히 로그만 기록
-                    Log.d("HomeScreen", "Auto-connect failed: ${result.reason}")
-                }
-
-                is AutoConnectResult.NotAttempted -> {
-                    // 자동 연결 시도하지 않음 - 조용히 로그 기록
-                    Log.d("HomeScreen", "Auto-connect not attempted")
-                }
+    // Event handler that delegates to MainViewModel
+    val onEvent: (HomeEvent) -> Unit = { event ->
+        when (event) {
+            is HomeEvent.NavigateToWishInput -> {
+                viewModel.onEvent(event) // UI navigation은 HomeViewModel에서
+            }
+            is HomeEvent.NavigateToDetail -> {
+                viewModel.onEvent(event) // UI navigation은 HomeViewModel에서  
+            }
+            is HomeEvent.ShareAchievement -> {
+                viewModel.onEvent(event) // UI effects는 HomeViewModel에서
             }
         }
     }
 
     HomeScreenContent(
         uiState = uiState,
-        onEvent = viewModel::onEvent,
-        isConnected = isConnected,
+        onEvent = onEvent,
         scannedDevices = scannedDevices,
         showDevicePicker = showDevicePicker,
+        blePhase = blePhase,
         activity = activity,
         mainViewModel = mainViewModel,
-        isAutoConnecting = isAutoConnecting,
         modifier = modifier
     )
 }
@@ -236,243 +258,144 @@ fun HomeScreen(
 fun HomeScreenContent(
     uiState: HomeViewState,
     onEvent: (HomeEvent) -> Unit,
-    isConnected: Boolean,
     scannedDevices: List<DeviceInfo>,
     showDevicePicker: Boolean,
+    blePhase: BlePhase,
     activity: MainActivity?,
-    mainViewModel: MainViewModel?,
-    isAutoConnecting: Boolean,
+    mainViewModel: MainViewModel = hiltViewModel<MainViewModel>(),
+    modifier: Modifier = Modifier
+) {
+    when (uiState) {
+        is HomeViewState.BluetoothDisconnected -> {
+            BluetoothDisconnectedContent(
+                uiState = uiState,
+                onEvent = onEvent,
+                activity = activity,
+                mainViewModel = mainViewModel,
+                blePhase = blePhase,
+                scannedDevices = scannedDevices,
+                showDevicePicker = showDevicePicker,
+                modifier = modifier
+            )
+        }
+
+        is HomeViewState.ConnectedNoWishes -> {
+            ConnectedNoWishesContent(
+                uiState = uiState,
+                onEvent = onEvent,
+                mainViewModel = mainViewModel,
+                modifier = modifier
+            )
+        }
+
+        is HomeViewState.ConnectedPartialWishes -> {
+            ConnectedPartialWishesContent(
+                uiState = uiState,
+                onEvent = onEvent,
+                mainViewModel = mainViewModel,
+                modifier = modifier
+            )
+        }
+
+        is HomeViewState.ConnectedFullWishes -> {
+            ConnectedFullWishesContent(
+                uiState = uiState,
+                onEvent = onEvent,
+                mainViewModel = mainViewModel,
+                modifier = modifier
+            )
+        }
+    }
+}
+
+@Composable
+private fun BluetoothDisconnectedContent(
+    uiState: HomeViewState.BluetoothDisconnected,
+    onEvent: (HomeEvent) -> Unit,
+    activity: MainActivity?,
+    mainViewModel: MainViewModel,
+    blePhase: BlePhase,
+    scannedDevices: List<DeviceInfo>,
+    showDevicePicker: Boolean,
     modifier: Modifier = Modifier
 ) {
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(Color(0xFFF5F7FF))
+            .windowInsetsPadding(WindowInsets.systemBars)
+            .padding(20.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp)
-        ) {
-            Spacer(modifier = Modifier.height(60.dp))
 
-            // 위시 리스트 섹션 (과거 기록이 있으면 표시)
-            if (uiState.recentRecords.isNotEmpty()) {
-                WishListSection(
-                    recentRecords = uiState.recentRecords,
-                    onWishClick = { date ->
-                        onEvent(HomeEvent.NavigateToDetail(date))
-                    }
+        // 블루투스 상태 및 연결 버튼 (연결되지 않은 경우에만 표시)
+        // 현재 시간
+        val currentTime = System.currentTimeMillis()
+        // 3초 제한 체크 (마지막 스캔으로부터 3초 경과했는지)
+        val canScan = (currentTime - uiState.lastBleScanTime) >= 3000L
+
+        BluetoothConnectionStatus(
+            onClick = {
+                Log.i(WR_EVENT, "[HomeScreen] ========== 수동 연결 버튼 클릭 ==========")
+                Log.i(WR_EVENT, "[HomeScreen] [MANUAL_CONNECT_DEBUG] === 수동 연결 플로우 시작 ===")
+
+                // 1. 현재 상태 로깅
+                Log.i(
+                    WR_EVENT,
+                    "[HomeScreen] [MANUAL_CONNECT_DEBUG] 1. 현재 시간: $currentTime"
                 )
-                Spacer(modifier = Modifier.height(30.dp))
-            }
-
-            // 오늘의 카운트 카드
-            if (uiState.todayWishUiState != null) {
-                TodayCountCard(
-                    currentCount = uiState.currentCount,
-                    targetCount = uiState.targetCount,
-                    uiState = uiState,
-                    onEvent = onEvent
+                Log.i(
+                    WR_EVENT,
+                    "[HomeScreen] [MANUAL_CONNECT_DEBUG] 2. 마지막 스캔 시간: ${uiState.lastBleScanTime}"
                 )
-                Spacer(modifier = Modifier.height(20.dp))
-            }
+                Log.i(WR_EVENT, "[HomeScreen] [MANUAL_CONNECT_DEBUG] 5. canScan: $canScan")
 
-            // 디버깅: BLE 연결 상태 표시
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFFFFF3E0)
-                )
-            ) {
-                if (uiState.isLoading) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(top = 4.dp)
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(12.dp),
-                            strokeWidth = 2.dp,
-                            color = Purple_Primary
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "스캔 중...",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Purple_Primary
-                        )
-                    }
-                }
-            }
+                // 연결 시도 상태가 아닐 때만 실행
+                if (!uiState.isScanning && !uiState.isAttemptingConnection) {
 
-            // 블루투스 상태 및 연결 버튼 (연결되지 않은 경우에만 표시)
-            if (!isConnected) {
-                // 현재 시간
-                val currentTime = System.currentTimeMillis()
-                // 3초 제한 체크 (마지막 스캔으로부터 3초 경과했는지)
-                val canScan = (currentTime - uiState.lastBleScanTime) >= 3000L
-
-                BluetoothConnectionStatus(
-                    onClick = {
-                        Log.i(WR_EVENT, "[HomeScreen] ========== 수동 연결 버튼 클릭 ==========")
-                        Log.i(WR_EVENT, "[HomeScreen] [MANUAL_CONNECT_DEBUG] === 수동 연결 플로우 시작 ===")
-
-                        // 1. 현재 상태 로깅
+                    if (canScan) {
                         Log.i(
                             WR_EVENT,
-                            "[HomeScreen] [MANUAL_CONNECT_DEBUG] 1. 현재 시간: $currentTime"
+                            "[HomeScreen] [MANUAL_CONNECT_DEBUG] 7. ✅ 스캔 가능 - 스캔 시작"
                         )
-                        Log.i(
-                            WR_EVENT,
-                            "[HomeScreen] [MANUAL_CONNECT_DEBUG] 2. 마지막 스캔 시간: ${uiState.lastBleScanTime}"
-                        )
-                        Log.i(
-                            WR_EVENT,
-                            "[HomeScreen] [MANUAL_CONNECT_DEBUG] 3. isAutoConnecting: $isAutoConnecting"
-                        )
-                        Log.i(
-                            WR_EVENT,
-                            "[HomeScreen] [MANUAL_CONNECT_DEBUG] 4. 버튼 활성화 상태: ${
-                                uiState.isConnectionButtonEnabled(isAutoConnecting)
-                            }"
-                        )
-                        Log.i(WR_EVENT, "[HomeScreen] [MANUAL_CONNECT_DEBUG] 5. canScan: $canScan")
 
-                        // 연결 시도 상태가 아닐 때만 실행
-                        if (uiState.isConnectionButtonEnabled(isAutoConnecting)) {
-                            Log.i(WR_EVENT, "[HomeScreen] [MANUAL_CONNECT_DEBUG] 6. ✅ 버튼 활성화됨 - 진행")
-
-                            if (canScan) {
-                                Log.i(
-                                    WR_EVENT,
-                                    "[HomeScreen] [MANUAL_CONNECT_DEBUG] 7. ✅ 스캔 가능 - 스캔 시작"
-                                )
-
-                                // 권한 상태 사전 체크
-                                Log.i(
-                                    WR_EVENT,
-                                    "[HomeScreen] [PERMISSION_DEBUG] === 수동 연결 권한 체크 ==="
-                                )
-
-                                // MainActivity 액세스 확인
-                                if (activity == null) {
-                                    Log.e(
-                                        WR_EVENT,
-                                        "[HomeScreen] [MANUAL_CONNECT_DEBUG] ❌ MainActivity 참조 없음!"
-                                    )
-                                    return@BluetoothConnectionStatus
-                                }
-
-                                Log.i(
-                                    WR_EVENT,
-                                    "[HomeScreen] [MANUAL_CONNECT_DEBUG] 8. MainActivity 참조 확인됨"
-                                )
-
-                                try {
-                                    // 기기 스캔 시작 이벤트 트리거
-                                    Log.i(
-                                        WR_EVENT,
-                                        "[HomeScreen] [MANUAL_CONNECT_DEBUG] 9. StartScanning 이벤트 전송..."
-                                    )
-
-                                    // MainActivity에서 직접 BLE 스캔 시작 (권한 체크 포함됨)
-                                    Log.i(
-                                        WR_EVENT,
-                                        "[HomeScreen] [MANUAL_CONNECT_DEBUG] 10. MainActivity.startBleScan() 호출..."
-                                    )
-                                    Log.i(
-                                        WR_EVENT,
-                                        "[HomeScreen] [PERMISSION_DEBUG] 💡 MainActivity.startBleScan()에서 자동으로 권한 체크 및 요청됩니다"
-                                    )
-                                    activity.startBleScan()
-
-                                    // 마지막 스캔 시간 업데이트
-                                    Log.i(
-                                        WR_EVENT,
-                                        "[HomeScreen] [MANUAL_CONNECT_DEBUG] 11. 스캔 시간 업데이트..."
-                                    )
-
-                                    Log.i(
-                                        WR_EVENT,
-                                        "[HomeScreen] [MANUAL_CONNECT_DEBUG] 12. ✅ 수동 스캔 시작 완료"
-                                    )
-
-                                } catch (e: Exception) {
-                                    Log.e(
-                                        WR_EVENT,
-                                        "[HomeScreen] [MANUAL_CONNECT_DEBUG] ❌ 스캔 시작 실패",
-                                        e
-                                    )
-                                }
-
-                            } else {
-                                val remainingTime =
-                                    ((3000L - (currentTime - uiState.lastBleScanTime)) / 1000L).toInt() + 1
-                                Log.w(
-                                    WR_EVENT,
-                                    "[HomeScreen] [MANUAL_CONNECT_DEBUG] 7. ⏱️ 스캔 쿨다운: ${remainingTime}초 대기 필요"
-                                )
-
-                                android.widget.Toast.makeText(
-                                    activity,
-                                    "${remainingTime}초 후에 다시 시도해주세요",
-                                    android.widget.Toast.LENGTH_SHORT
-                                ).show()
-                            }
+                        // MainActivity 액세스 확인
+                        if (activity == null) {
+                            Log.e(
+                                WR_EVENT,
+                                "[HomeScreen] [MANUAL_CONNECT_DEBUG] ❌ MainActivity 참조 없음!"
+                            )
+                            return@BluetoothConnectionStatus
                         }
 
-                        Log.i(WR_EVENT, "[HomeScreen] [MANUAL_CONNECT_DEBUG] === 수동 연결 플로우 완료 ===")
-                        Log.i(WR_EVENT, "[HomeScreen] ========== 수동 연결 버튼 클릭 완료 ==========")
-                    },
-                    uiState = uiState,
-                    isAutoConnecting = isAutoConnecting
-                )
-            }
+                        try {
+                            activity.startBleScan()
+                        } catch (e: Exception) {
+                            Log.e(
+                                WR_EVENT,
+                                "[HomeScreen] [MANUAL_CONNECT_DEBUG] ❌ 스캔 시작 실패",
+                                e
+                            )
+                        }
 
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // 버튼 표시 로직 (WISH RING 연결 시에는 버튼 숨김)
-            if (isConnected) {
-                when {
-                    uiState.todayWishUiState == null && uiState.recentRecords.isEmpty() -> {
-                        // 완전히 비어있는 상태 (0개)
-                        WishRegistrationPrompt(
-                            onClick = { onEvent(HomeEvent.NavigateToWishInput) },
-                            remainingCount = 3
+                    } else {
+                        val remainingTime =
+                            ((3000L - (currentTime - uiState.lastBleScanTime)) / 1000L).toInt() + 1
+                        Log.w(
+                            WR_EVENT,
+                            "[HomeScreen] [MANUAL_CONNECT_DEBUG] 7. ⏱️ 스캔 쿨다운: ${remainingTime}초 대기 필요"
                         )
-                    }
 
-                    uiState.todayWishUiState == null && uiState.recentRecords.size < 3 -> {
-                        // 과거 기록은 있지만 3개 미만이고 오늘 위시 없음 (1-2개)
-                        WishButton(
-                            onClick = { onEvent(HomeEvent.NavigateToWishInput) }
-                        )
+                        android.widget.Toast.makeText(
+                            activity,
+                            "${remainingTime}초 후에 다시 시도해주세요",
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
                     }
-                    // 그 외 경우: 3개 이상이거나 오늘 위시 진행중이면 버튼 없음
                 }
-            }
-
-            Spacer(modifier = Modifier.height(50.dp))
-
-            // Report Card
-            ReportCard(
-                uiState = uiState,
-                onEvent = onEvent
-            )
-
-            // Bottom spacing for floating bottom bar
-            Spacer(modifier = Modifier.height(120.dp))
-        }
-
-        // Floating Bottom Bar
-        FloatingBottomBar(
+            },
             uiState = uiState,
-            isConnected = isConnected,
-            onShareClick = { onEvent(HomeEvent.ShareAchievement) },
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .windowInsetsPadding(WindowInsets.systemBars)
+            blePhase = blePhase
         )
 
         // Show loading overlay
@@ -496,21 +419,8 @@ fun HomeScreenContent(
                 // Show error snackbar or dialog
                 // For now, just log the error
                 println("Home Error: $errorMessage")
-                onEvent(HomeEvent.DismissError)
+                mainViewModel.dismissWishDataError()
             }
-        }
-
-        // Share dialog
-        if (uiState.showShareDialog) {
-            ShareDialog(
-                count = uiState.totalCount,
-                onConfirm = { message, hashtags ->
-                    onEvent(HomeEvent.ConfirmShare(message, hashtags))
-                },
-                onDismiss = {
-                    onEvent(HomeEvent.DismissShareDialog)
-                }
-            )
         }
 
         if (showDevicePicker && scannedDevices.isNotEmpty()) {
@@ -526,230 +436,294 @@ fun HomeScreenContent(
                         }
 
                         activity.connectToDeviceByAddress(deviceAddress)
-
-                        mainViewModel?.dismissDevicePicker()
-
-                        Log.i(WR_EVENT, "[HomeScreen] [DEVICE_CONNECT_DEBUG] 5. ✅ 기기 연결 시작 완료")
+                        mainViewModel.selectDevice()
 
                     } catch (e: Exception) {
                         Log.e(WR_EVENT, "[HomeScreen] [DEVICE_CONNECT_DEBUG] ❌ 기기 연결 시작 실패", e)
                     }
-
-                    Log.i(WR_EVENT, "[HomeScreen] [DEVICE_CONNECT_DEBUG] === 기기 연결 플로우 완료 ===")
-                    Log.i(WR_EVENT, "[HomeScreen] ========== 기기 선택 및 연결 완료 ==========")
                 },
                 onDismiss = {
-                    mainViewModel?.dismissDevicePicker()
+                    mainViewModel.dismissDevicePicker()
                 }
             )
-        }
-
-        if (uiState.showConnectionSuccessAnimation) {
-            ConnectionSuccessAnimation(
-                modifier = Modifier.align(Alignment.Center)
-            )
-        }
-
-
-    }
-}
-
-@Composable
-private fun TodayCountCard(
-    currentCount: Int,
-    targetCount: Int,
-    modifier: Modifier = Modifier,
-    uiState: HomeViewState? = null,
-    onEvent: ((HomeEvent) -> Unit)? = null
-) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(10.dp),
-        color = Color.White,
-        shadowElevation = 4.dp
-    ) {
-        Column(
-            modifier = Modifier.padding(vertical = 24.dp)
-        ) {
-
-            Row(
-                modifier = Modifier.fillMaxWidth().height(120.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.weight(1f).fillMaxHeight()
-                ) {
-                    Column(
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = stringResource(id = R.string.todays_count),
-                            color = Color(0xFF333333),
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = currentCount.toString(),
-                            color = Color(0xFF333333),
-                            fontSize = 38.sp,
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                    }
-                }
-
-                // Center: Vertical Divider
-                VerticalDivider(
-                    color = Color(0xFFDBDBDB),
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .width(0.5.dp)
-                )
-
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.weight(1f).fillMaxHeight()
-                ) {
-                    CircularProgress(
-                        current = currentCount,
-                        target = targetCount,
-                        modifier = Modifier.size(120.dp),
-                        showText = true
-                    )
-                }
-            }
         }
     }
 }
 
 @Composable
-private fun WishRegistrationPrompt(
-    onClick: () -> Unit,
-    remainingCount: Int = 3,
+private fun ConnectedNoWishesContent(
+    uiState: HomeViewState.ConnectedNoWishes,
+    onEvent: (HomeEvent) -> Unit,
+    mainViewModel: MainViewModel,
     modifier: Modifier = Modifier
 ) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(10.dp),
-        color = Color.White,
-        shadowElevation = 4.dp
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color(0xFFF5F7FF))
+            .windowInsetsPadding(WindowInsets.systemBars)
     ) {
         Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 48.dp, horizontal = 24.dp)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp)
         ) {
-            Text(
-                text = "오늘의 위시를 등록하세요",
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                ),
-                color = Color(0xFF333333),
-                textAlign = TextAlign.Center
-            )
+            Spacer(modifier = Modifier.height(30.dp))
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Text(
-                text = "매일 새로운 목표를 설정하여\n꾸준히 성장해보세요",
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Normal
-                ),
-                color = Color(0xFF666666),
-                textAlign = TextAlign.Center,
-                lineHeight = 20.sp
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "${remainingCount}개를 더 등록할 수 있어요",
-                style = MaterialTheme.typography.bodySmall.copy(
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Normal
-                ),
-                color = Purple_Medium,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            Button(
-                onClick = onClick,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Purple_Medium
-                ),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp)
-            ) {
-                Text(
-                    text = "WISH 등록하기",
-                    style = MaterialTheme.typography.labelLarge.copy(
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
+            // 오늘의 위시 카드 (오늘의 위시가 있을 때만 표시)
+            uiState.todayWish?.let { todayWish ->
+                LatestWishCard(
+                    latestRecord = WishDayUiState(
+                        date = LocalDate.now(),
+                        wishText = todayWish.wishText,
+                        isCompleted = todayWish.isCompleted,
+                        targetCount = todayWish.targetCount,
+                        completedCount = todayWish.currentCount
                     ),
-                    color = Color.White
+                    onWishClick = { date ->
+                        onEvent(HomeEvent.NavigateToDetail(date))
+                    }
                 )
             }
+
+            Spacer(modifier = Modifier.height(30.dp))
+
+            // 오늘의 카운트 카드
+            if (uiState.todayWish != null) {
+                TodayCountCard(
+                    currentCount = uiState.todayWish.currentCount,
+                    targetCount = uiState.todayWish.targetCount,
+                    uiState = uiState,
+                    onEvent = onEvent
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+            }
+
+            // 완전히 비어있는 상태 - WishRegistrationPrompt
+            WishRegistrationPrompt(
+                onClick = { onEvent(HomeEvent.NavigateToWishInput) },
+                remainingCount = 3
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Report Card (with infinite scroll)
+            WishHistorySection(
+                uiState = uiState,
+                onEvent = onEvent,
+                onLoadMore = { mainViewModel.loadMoreWishes() }
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Bottom spacing for floating bottom bar
+            Spacer(modifier = Modifier.height(100.dp))
         }
+
+        FloatingBottomBar(
+            uiState = uiState,
+            isConnected = true,
+            onShareClick = { onEvent(HomeEvent.ShareAchievement) },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+        )
+
+        // Common overlays
+        ConnectedContentOverlays(uiState = uiState, onEvent = onEvent, onDismissError = { mainViewModel.dismissWishDataError() })
+
     }
 }
 
-
 @Composable
-private fun WishListSection(
-    recentRecords: List<DailyRecord>,
-    onWishClick: (String) -> Unit,
+private fun ConnectedPartialWishesContent(
+    uiState: HomeViewState.ConnectedPartialWishes,
+    onEvent: (HomeEvent) -> Unit,
+    mainViewModel: MainViewModel,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+    Box(
         modifier = modifier
+            .fillMaxSize()
+            .background(Color(0xFFF5F7FF))
+            .windowInsetsPadding(WindowInsets.systemBars)
     ) {
-        recentRecords.take(1).forEach { record ->
-            WishCard(
-                wishText = record.wishText,
-                onClick = {
-                    onWishClick(record.dateString)
-                }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp)
+        ) {
+            Spacer(modifier = Modifier.height(30.dp))
+
+            // 오늘의 위시 카드 (오늘의 위시가 있을 때만 표시)
+            uiState.todayWish?.let { todayWish ->
+                LatestWishCard(
+                    latestRecord = WishDayUiState(
+                        date = LocalDate.now(),
+                        wishText = todayWish.wishText,
+                        isCompleted = todayWish.isCompleted,
+                        targetCount = todayWish.targetCount,
+                        completedCount = todayWish.currentCount
+                    ),
+                    onWishClick = { date ->
+                        onEvent(HomeEvent.NavigateToDetail(date))
+                    }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(30.dp))
+
+            // 오늘의 카운트 카드
+            if (uiState.todayWish != null) {
+                TodayCountCard(
+                    currentCount = uiState.todayWish.currentCount,
+                    targetCount = uiState.todayWish.targetCount,
+                    uiState = uiState,
+                    onEvent = onEvent
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+            }
+
+            // 부분적인 상태 - WishButton
+            WishButton(
+                onClick = { onEvent(HomeEvent.NavigateToWishInput) }
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Report Card (with infinite scroll)
+            WishHistorySection(
+                uiState = uiState,
+                onEvent = onEvent,
+                onLoadMore = { mainViewModel.loadMoreWishes() }
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Bottom spacing for floating bottom bar
+            Spacer(modifier = Modifier.height(100.dp))
+        }
+
+        // Floating Bottom Bar
+        FloatingBottomBar(
+            uiState = uiState,
+            isConnected = true,
+            onShareClick = { onEvent(HomeEvent.ShareAchievement) },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+        )
+
+        // Common overlays
+        ConnectedContentOverlays(uiState = uiState, onEvent = onEvent, onDismissError = { mainViewModel.dismissWishDataError() })
+
+    }
+}
+
+@Composable
+private fun ConnectedFullWishesContent(
+    uiState: HomeViewState.ConnectedFullWishes,
+    onEvent: (HomeEvent) -> Unit,
+    mainViewModel: MainViewModel,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color(0xFFF5F7FF))
+            .windowInsetsPadding(WindowInsets.systemBars)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp)
+        ) {
+            Spacer(modifier = Modifier.height(30.dp))
+
+            // 오늘의 위시 카드 (오늘의 위시가 있을 때만 표시)
+            uiState.todayWish?.let { todayWish ->
+                LatestWishCard(
+                    latestRecord = WishDayUiState(
+                        date = LocalDate.now(),
+                        wishText = todayWish.wishText,
+                        isCompleted = todayWish.isCompleted,
+                        targetCount = todayWish.targetCount,
+                        completedCount = todayWish.currentCount
+                    ),
+                    onWishClick = { date ->
+                        onEvent(HomeEvent.NavigateToDetail(date))
+                    }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(30.dp))
+
+            // 오늘의 카운트 카드
+            if (uiState.todayWish != null) {
+                TodayCountCard(
+                    currentCount = uiState.todayWish.currentCount,
+                    targetCount = uiState.todayWish.targetCount,
+                    uiState = uiState,
+                    onEvent = onEvent
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Report Card (with infinite scroll)
+            WishHistorySection(
+                uiState = uiState,
+                onEvent = onEvent,
+                onLoadMore = { mainViewModel.loadMoreWishes() }
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Bottom spacing for floating bottom bar
+            Spacer(modifier = Modifier.height(100.dp))
+        }
+
+        // Floating Bottom Bar
+        FloatingBottomBar(
+            uiState = uiState,
+            isConnected = true,
+            onShareClick = { onEvent(HomeEvent.ShareAchievement) },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+        )
+
+        // Common overlays
+        ConnectedContentOverlays(uiState = uiState, onEvent = onEvent, onDismissError = { mainViewModel.dismissWishDataError() })
+
+    }
+}
+
+@Composable
+private fun ConnectedContentOverlays(
+    uiState: HomeViewState,
+    onEvent: (HomeEvent) -> Unit,
+    onDismissError: () -> Unit
+) {
+    if (uiState.isLoading) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.5f))
+                .clickable { /* Block clicks */ }
+        ) {
+            CircularProgressIndicator(
+                color = Purple_Primary
             )
         }
     }
-}
 
-@Composable
-private fun WishButton(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Button(
-        onClick = onClick,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = Purple_Medium
-        ),
-        shape = RoundedCornerShape(8.dp),
-        modifier = modifier
-            .fillMaxWidth()
-            .height(50.dp)
-    ) {
-        Text(
-            text = stringResource(id = R.string.wish_button_text),
-            style = MaterialTheme.typography.labelLarge.copy(
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold
-            ),
-            color = Color.White
-        )
+    uiState.error?.let { errorMessage ->
+        LaunchedEffect(errorMessage) {
+            println("Home Error: $errorMessage")
+            onDismissError()
+        }
     }
 }
-
-

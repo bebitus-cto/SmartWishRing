@@ -96,6 +96,22 @@ data class WishUiState(
             )
         }
 
+        /**
+         * Create from PastWishUiState
+         */
+        fun fromWishDay(wishDay: WishDayUiState): WishUiState {
+            val now = DateUtils.getCurrentTimestamp()
+            return WishUiState(
+                date = wishDay.dateString,
+                wishText = wishDay.wishText,
+                targetCount = wishDay.targetCount,
+                currentCount = wishDay.completedCount,
+                isCompleted = wishDay.isCompleted,
+                createdAt = now,
+                updatedAt = now
+            )
+        }
+
     }
 }
 

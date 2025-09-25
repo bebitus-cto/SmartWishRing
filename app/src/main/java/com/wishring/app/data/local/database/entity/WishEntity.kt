@@ -24,7 +24,7 @@ data class WishData(
  * Entity representing daily wish count records
  * Stores user's daily progress and wish information
  */
-@Entity(tableName = Constants.TABLE_WISH_COUNTS)
+@Entity(tableName = Constants.TABLE_WISHES)
 data class WishEntity(
     /**
      * Date in yyyy-MM-dd format (primary key)

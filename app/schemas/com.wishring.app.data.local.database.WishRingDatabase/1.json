@@ -2,10 +2,10 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "af03b6c0f10e447de8f01b0ab6c47b90",
+    "identityHash": "91b4767755ca345e1a1034f2ed54cd3a",
     "entities": [
       {
-        "tableName": "wish_counts",
+        "tableName": "wishes",
         "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`date` TEXT NOT NULL, `total_count` INTEGER NOT NULL, `wish_text` TEXT NOT NULL, `target_count` INTEGER NOT NULL, `is_completed` INTEGER NOT NULL, `created_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, `wishes_json` TEXT NOT NULL, `active_wish_index` INTEGER NOT NULL, PRIMARY KEY(`date`))",
         "fields": [
           {
@@ -76,7 +76,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'af03b6c0f10e447de8f01b0ab6c47b90')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '91b4767755ca345e1a1034f2ed54cd3a')"
     ]
   }
 }

@@ -1,4 +1,3 @@
-
 package com.wishring.app.presentation.component
 
 import androidx.compose.foundation.background
@@ -13,26 +12,25 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.wishring.app.presentation.wishinput.CustomNumberPicker
-import com.wishring.app.ui.theme.WishRingTheme
 
 /**
- * Reusable wish card component
- * Used in Home screen and Wish Input screen
+ * Reusable wish card item component
+ * Used in WishDetailScreen (Normal mode) and WishInputScreen (Edit mode)
  * Supports both display and input modes
  */
 @Composable
-fun WishCard(
+fun WishCardItem(
     wishText: String,
     onClick: () -> Unit = {},
     modifier: Modifier = Modifier,
-    isInputMode: Boolean = false,
+    isEditMode: Boolean = false,
     targetCount: Int = 1000,
     onTextChange: ((String) -> Unit)? = null,
     onTargetCountChange: ((Int) -> Unit)? = null,
@@ -41,19 +39,25 @@ fun WishCard(
     placeholder: String = "소원을 입력하세요...",
     showTargetCount: Boolean = true
 ) {
-    Surface(
+    Box(
         modifier = modifier
             .fillMaxWidth()
+            .shadow(
+                elevation = 2.dp,
+                shape = RoundedCornerShape(5.dp),
+                spotColor = Color(0x1A000000)
+            )
+            .background(
+                color = Color.White,
+                shape = RoundedCornerShape(5.dp)
+            )
             .then(
-                if (!isInputMode) Modifier.clickable { onClick() }
+                if (!isEditMode) Modifier.clickable { onClick() }
                 else Modifier
-            ),
-        shape = RoundedCornerShape(5.dp),
-        color = Color.White,
-        shadowElevation = 2.dp
+            )
     ) {
-        if (isInputMode) {
-            WishInputCard(
+        if (isEditMode) {
+            WishEditCard(
                 wishText = wishText,
                 targetCount = targetCount,
                 onTextChange = onTextChange ?: {},
@@ -64,13 +68,13 @@ fun WishCard(
                 showTargetCount = showTargetCount
             )
         } else {
-            WishDisplayCard(wishText = wishText)
+            WishNormalCard(wishText = wishText)
         }
     }
 }
 
 @Composable
-private fun WishDisplayCard(
+private fun WishNormalCard(
     wishText: String
 ) {
     Column(
@@ -93,7 +97,7 @@ private fun WishDisplayCard(
 }
 
 @Composable
-private fun WishInputCard(
+private fun WishEditCard(
     wishText: String,
     targetCount: Int,
     onTextChange: (String) -> Unit,
@@ -108,62 +112,65 @@ private fun WishInputCard(
             .fillMaxWidth()
             .padding(16.dp)
     ) {
-        if (showDeleteButton && onDelete != null) {
+        // Text input field with delete button in the same row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            // Text input field
             Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.TopEnd
+                modifier = Modifier
+                    .weight(1f)
+                    .background(
+                        color = Color(0xFFF9FBFF),
+                        shape = RoundedCornerShape(5.dp)
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = Color(0xFFF0F0F0),
+                        shape = RoundedCornerShape(5.dp)
+                    )
+                    .padding(12.dp)
             ) {
+                if (wishText.isEmpty()) {
+                    Text(
+                        text = placeholder,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontSize = 12.sp
+                        ),
+                        color = Color(0xFF999999)
+                    )
+                }
+                
+                BasicTextField(
+                    value = wishText,
+                    onValueChange = onTextChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    textStyle = MaterialTheme.typography.bodySmall.copy(
+                        fontSize = 12.sp,
+                        color = Color(0xFF333333)
+                    ),
+                    maxLines = 2
+                )
+            }
+            
+            // Delete button on the right
+            if (showDeleteButton && onDelete != null) {
                 IconButton(
                     onClick = onDelete,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier
+                        .size(40.dp)
+                        .padding(top = 4.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Delete,
                         contentDescription = "Delete wish",
                         tint = Color(0xFF999999),
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             }
-        }
-        
-        Spacer(modifier = Modifier.height(if (showDeleteButton && onDelete != null) 8.dp else 0.dp))
-        
-        // Text input field
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    color = Color(0xFFF9FBFF),
-                    shape = RoundedCornerShape(5.dp)
-                )
-                .border(
-                    width = 1.dp,
-                    color = Color(0xFFF0F0F0),
-                    shape = RoundedCornerShape(5.dp)
-                )
-                .padding(12.dp)
-        ) {
-            if (wishText.isEmpty()) {
-                Text(
-                    text = placeholder,
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        fontSize = 12.sp
-                    ),
-                    color = Color(0xFF999999)
-                )
-            }
-            
-            BasicTextField(
-                value = wishText,
-                onValueChange = onTextChange,
-                modifier = Modifier.fillMaxWidth(),
-                textStyle = MaterialTheme.typography.bodySmall.copy(
-                    fontSize = 12.sp,
-                    color = Color(0xFF333333)
-                ),
-                maxLines = 2
-            )
         }
         
         if (showTargetCount) {
@@ -193,57 +200,5 @@ private fun WishInputCard(
                 )
             }
         }
-    }
-}
-
-@Preview(showBackground = true, name = "Display Mode")
-@Composable
-private fun WishCardDisplayPreview() {
-    WishRingTheme {
-        WishCard(
-            wishText = "매일 운동하기",
-            onClick = { /* Preview - no action */ }
-        )
-    }
-}
-
-@Preview(showBackground = true, name = "Input Mode - Empty")
-@Composable
-private fun WishCardInputEmptyPreview() {
-    WishRingTheme {
-        WishCard(
-            wishText = "",
-            isInputMode = true,
-            targetCount = 1000,
-            onTextChange = { /* Preview - no action */ },
-            onTargetCountChange = { /* Preview - no action */ }
-        )
-    }
-}
-
-@Preview(showBackground = true, name = "Input Mode - Filled")
-@Composable
-private fun WishCardInputFilledPreview() {
-    WishRingTheme {
-        WishCard(
-            wishText = "나는 매일 성장하고 있다",
-            isInputMode = true,
-            targetCount = 2000,
-            showDeleteButton = true,
-            onTextChange = { /* Preview - no action */ },
-            onTargetCountChange = { /* Preview - no action */ },
-            onDelete = { /* Preview - no action */ }
-        )
-    }
-}
-
-@Preview(showBackground = true, name = "Long Text Display")
-@Composable
-private fun WishCardLongTextPreview() {
-    WishRingTheme {
-        WishCard(
-            wishText = "나는 매일 아침 일찍 일어나서 운동을 하고, 건강한 아침 식사를 먹고, 독서를 통해 새로운 지식을 습득하며, 가족과 소중한 시간을 보내고, 일에서도 최선을 다하여 더 나은 내가 되기 위해 끊임없이 노력하고 성장하는 사람이 되고 싶다.",
-            onClick = { /* Preview - no action */ }
-        )
     }
 }

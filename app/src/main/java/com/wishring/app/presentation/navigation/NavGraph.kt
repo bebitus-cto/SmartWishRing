@@ -68,7 +68,6 @@ fun WishRingNavGraph(
         ) { backStackEntry ->
             val date = backStackEntry.arguments?.getString(Screen.Detail.ARG_DATE)
             WishDetailScreen(
-                initialDate = date,
                 onNavigateBack = {
                     navController.popBackStack()
                 }
